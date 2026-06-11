@@ -25,6 +25,11 @@ Do not jump directly to DDL. The documents from the prior steps should be follow
 
 - `docs/01-business-requirement-analysis.md`
 - `docs/02-conceptual-design-erd.md`
+- `docs/03-logical-design.md`
+- `docs/04-design-validation.md`
+- `docs/05-db-definition.sql`
+- `docs/06-sample-data.sql`
+- `docs/07-query-design.sql`
 
 ## DBMS
 

@@ -138,13 +138,13 @@ If your group uses a different command name, update this README with the correct
 The `outputs/` folder must contain the following files:
 
 ```text
-01-business-req-analysis-G<Group number>.md
-02-erd-design-G<Group number>.md
-03-logical-design-G<Group number>.md
-04-design-validation-G<Group number>.md
-05-db-definition-G<Group number>.sql
-06-sample-data-G<Group number>.sql
-07-query-design-G<Group number>.sql
+01-business-req-analysis-G4.md
+02-erd-design-G4.md
+03-logical-design-G4.md
+04-design-validation-G4.md
+05-db-definition-G4.sql
+06-sample-data-G4.sql
+07-query-design-G4.sql
 ```
 
 Example for Group 01:

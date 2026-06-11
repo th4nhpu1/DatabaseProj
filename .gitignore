@@ -1,0 +1,19 @@
+.DS_Store
+Thumbs.db
+
+# Editor settings
+.vscode/
+.idea/
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+
+# Node and OpenCode local dependencies
+node_modules/
+.opencode/node_modules/
+
+# Python cache, if any
+__pycache__/
+*.pyc
