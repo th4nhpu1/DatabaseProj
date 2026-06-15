@@ -60,14 +60,13 @@ Save to `outputs/02-erd-design-G4.md`.
 The document must include:
 
 - A Mermaid `erDiagram`
-- Main entities with identifiers and key attributes
-- You get error : Error: Parse error on line 59:
-...  int booking_id FK UK        int staff
------------------------^
-Expecting 'BLOCK_STOP', 'ATTRIBUTE_WORD', ',', 'COMMENT', got 'ATTRIBUTE_KEY'. Checkagain when you try to draw the Diagram. You can also use an online Mermaid live editor to validate the syntax.
-- Relationship names, cardinalities, and participation constraints
-- Notes for optionality, historical tracking, and status-driven behavior
-- Assumptions that affect conceptual design
+- Main entities with identifiers and key attributes.
+- **CRITICAL MERMAID SYNTAX RULE:** If an attribute has multiple constraints (e.g., both Foreign Key and Unique Key), you MUST separate them with a comma and space. 
+  -  Correct: `int booking_id FK, UK`
+  -  Incorrect: `int booking_id FK UK` (This causes parse errors).
+- Relationship names, cardinalities, and participation constraints.
+- Notes for optionality, historical tracking, and status-driven behavior.
+- Assumptions that affect conceptual design.
 
 # Step 3: Logical Database Design
 

@@ -90,20 +90,15 @@ VALUES (3, 'CL-202', '2026-06-14 10:00:00', '2026-06-14 12:00:00', 'CS401 Lectur
 INSERT INTO [Booking] (user_id, space_code, requested_start, requested_end, purpose, expected_participants, booking_type, status, created_at)
 VALUES (7, 'SW-001', '2026-06-25 15:00:00', '2026-06-25 18:00:00', 'Study Group Session', 15, 'student_activity', 'cancelled', '2026-06-12 11:00:00');
 
--- 7. Booking that conflicts with booking #1 (same space, overlapping time) — should be prevented
--- (This is a negative test case — comment out to avoid actual insert failure)
--- INSERT INTO [Booking] (user_id, space_code, requested_start, requested_end, purpose, expected_participants, booking_type, status)
--- VALUES (6, 'CL-201', '2026-06-20 10:00:00', '2026-06-20 12:00:00', 'Admin Review', 5, 'admin_event', 'approved');
-
--- 8. Checked-in booking (currently in progress)
+-- 7. Checked-in booking (currently in progress)
 INSERT INTO [Booking] (user_id, space_code, requested_start, requested_end, purpose, expected_participants, booking_type, status, created_at)
 VALUES (8, 'MR-402', '2026-06-15 09:00:00', '2026-06-15 11:00:00', 'Research Group Discussion', 6, 'meeting', 'checked_in', '2026-06-08 07:00:00');
 
--- 9. Booking for upcoming seminar (approved)
+-- 8. Booking for upcoming seminar (approved)
 INSERT INTO [Booking] (user_id, space_code, requested_start, requested_end, purpose, expected_participants, booking_type, status, created_at)
 VALUES (3, 'AU-101', '2026-07-01 09:00:00', '2026-07-01 12:00:00', 'Guest Lecture — AI in Healthcare', 180, 'seminar', 'approved', '2026-06-10 13:00:00');
 
--- 10. Booking for examination
+-- 9. Booking for examination
 INSERT INTO [Booking] (user_id, space_code, requested_start, requested_end, purpose, expected_participants, booking_type, status, created_at)
 VALUES (6, 'CL-201', '2026-07-05 08:00:00', '2026-07-05 12:00:00', 'CS301 Final Exam', 55, 'examination', 'pending', '2026-06-18 09:00:00');
 
@@ -126,15 +121,13 @@ VALUES (4, 1, 'rejected', '2026-06-06 08:30:00', 'Rejected — Main Auditorium r
 INSERT INTO [BookingApproval] (booking_id, staff_id, decision, decision_time, decision_note)
 VALUES (5, 2, 'approved', '2026-06-02 10:00:00', 'Approved');
 
--- Booking #6 cancelled (no approval needed — cancelled before review)
-
--- Booking #8 approved by Bob
+-- Booking #7 approved by Bob
 INSERT INTO [BookingApproval] (booking_id, staff_id, decision, decision_time, decision_note)
-VALUES (8, 2, 'approved', '2026-06-09 08:00:00', 'Approved');
+VALUES (7, 2, 'approved', '2026-06-09 08:00:00', 'Approved');
 
--- Booking #9 approved by Alice
+-- Booking #8 approved by Alice
 INSERT INTO [BookingApproval] (booking_id, staff_id, decision, decision_time, decision_note)
-VALUES (9, 1, 'approved', '2026-06-12 14:00:00', 'Approved — high-profile guest lecture');
+VALUES (8, 1, 'approved', '2026-06-12 14:00:00', 'Approved — high-profile guest lecture');
 
 -- ------------------------------------------------------------
 -- BookingSession (check-in / check-out records)
@@ -143,9 +136,9 @@ VALUES (9, 1, 'approved', '2026-06-12 14:00:00', 'Approved — high-profile gues
 INSERT INTO [BookingSession] (booking_id, actual_start, checked_in_by, initial_condition, actual_end, final_condition, usage_notes)
 VALUES (5, '2026-06-14 10:05:00', 2, 'Clean, all equipment functional', '2026-06-14 12:00:00', 'Clean, projector bulb dim', 'Projector bulb needs replacement; notified Bob');
 
--- Booking #8: Checked-in, not yet completed
+-- Booking #7: Checked-in, not yet completed
 INSERT INTO [BookingSession] (booking_id, actual_start, checked_in_by, initial_condition, actual_end, final_condition, usage_notes)
-VALUES (8, '2026-06-15 09:02:00', 9, 'Room tidy, whiteboard clean', NULL, NULL, NULL);
+VALUES (7, '2026-06-15 09:02:00', 9, 'Room tidy, whiteboard clean', NULL, NULL, NULL);
 
 -- ------------------------------------------------------------
 -- Maintenance records

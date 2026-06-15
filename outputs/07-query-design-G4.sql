@@ -118,12 +118,6 @@ JOIN [Space] s ON b.space_code = s.space_code
 WHERE b.status = 'no_show'
 ORDER BY b.requested_start DESC;
 
--- Note: No-show records are created by application logic
--- when an approved booking passes its requested_start time
--- without a corresponding check-in. In the sample data,
--- Booking #2 (MR-401, 2026-06-20 14:00-16:00) would be
--- flagged as no-show by the application after the threshold.
-
 -- ------------------------------------------------------------
 -- Query 5: Space Utilization Report
 -- Business Question: What percentage of total available time

@@ -31,7 +31,7 @@ The School of Computer Science needs a database system to manage the booking and
 | Space | space_code, space_name, space_type, building, floor, room_number, capacity, status, usage_policy |
 | Facility | facility_id, facility_name |
 | SpaceFacility | space_code, facility_id |
-| Booking | booking_id, requester, space, requested_start, requested_end, purpose, expected_participants, booking_type, status |
+| Booking | booking_id, requester, space, requested_start, requested_end, purpose, expected_participants, booking_type, status, created_at |
 | BookingApproval | booking_id, staff_id, decision, decision_time, decision_note |
 | BookingSession | booking_id, actual_start, checked_in_by, initial_condition, actual_end, final_condition, usage_notes |
 | Maintenance | maintenance_id, space, reporter, assigned_staff, problem_description, start_time, completion_time, status, result_note |

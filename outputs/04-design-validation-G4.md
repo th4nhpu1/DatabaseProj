@@ -42,7 +42,7 @@
 
 ## Limitations
 
-- CHECK constraints on status columns do not enforce valid state _transitions_ (e.g., 'pending' → 'approved' is valid, but 'completed' → 'pending' is not). State machine logic must live in the application layer or in a trigger.
+- CHECK constraints on status columns do not enforce valid state _transitions_ (e.g., 'pending' -> 'approved' is valid, but 'completed' -> 'pending' is not). State machine logic must live in the application layer or in a trigger.
 - The overlap-prevention trigger must handle concurrency (e.g., use SERIALIZABLE isolation or application-level locking).
 - BookingSession combines check-in and check-out; if a booking is checked in but never completed, actual_end will remain NULL, which is handled correctly.
 - Maintenance has two nullable FK references to User (reporter_id, assigned_to) — this matches the requirement that records may exist without a linked user.

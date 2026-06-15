@@ -35,15 +35,15 @@
 ### SpaceFacility
 | Column | Type | Nullable | Constraints |
 |--------|------|----------|-------------|
-| space_code | NVARCHAR(20) | NOT NULL | PRIMARY KEY (composite), FK → Space(space_code) |
-| facility_id | INT | NOT NULL | PRIMARY KEY (composite), FK → Facility(facility_id) |
+| space_code | NVARCHAR(20) | NOT NULL | PRIMARY KEY (composite), FK -> Space(space_code) |
+| facility_id | INT | NOT NULL | PRIMARY KEY (composite), FK -> Facility(facility_id) |
 
 ### Booking
 | Column | Type | Nullable | Constraints |
 |--------|------|----------|-------------|
 | booking_id | INT | NOT NULL | PRIMARY KEY, IDENTITY(1,1) |
-| user_id | INT | NOT NULL | FK → User(user_id) |
-| space_code | NVARCHAR(20) | NOT NULL | FK → Space(space_code) |
+| user_id | INT | NOT NULL | FK -> User(user_id) |
+| space_code | NVARCHAR(20) | NOT NULL | FK -> Space(space_code) |
 | requested_start | DATETIME2 | NOT NULL | |
 | requested_end | DATETIME2 | NOT NULL | CHECK (requested_end > requested_start) |
 | purpose | NVARCHAR(MAX) | NOT NULL | |
@@ -56,8 +56,8 @@
 | Column | Type | Nullable | Constraints |
 |--------|------|----------|-------------|
 | approval_id | INT | NOT NULL | PRIMARY KEY, IDENTITY(1,1) |
-| booking_id | INT | NOT NULL | UNIQUE, FK → Booking(booking_id) |
-| staff_id | INT | NOT NULL | FK → User(user_id) |
+| booking_id | INT | NOT NULL | UNIQUE, FK -> Booking(booking_id) |
+| staff_id | INT | NOT NULL | FK -> User(user_id) |
 | decision | NVARCHAR(20) | NOT NULL | CHECK (decision IN ('approved','rejected')) |
 | decision_time | DATETIME2 | NOT NULL | DEFAULT GETDATE() |
 | decision_note | NVARCHAR(MAX) | NULL | |
@@ -66,9 +66,9 @@
 | Column | Type | Nullable | Constraints |
 |--------|------|----------|-------------|
 | session_id | INT | NOT NULL | PRIMARY KEY, IDENTITY(1,1) |
-| booking_id | INT | NOT NULL | UNIQUE, FK → Booking(booking_id) |
+| booking_id | INT | NOT NULL | UNIQUE, FK -> Booking(booking_id) |
 | actual_start | DATETIME2 | NOT NULL | |
-| checked_in_by | INT | NOT NULL | FK → User(user_id) |
+| checked_in_by | INT | NOT NULL | FK -> User(user_id) |
 | initial_condition | NVARCHAR(MAX) | NULL | |
 | actual_end | DATETIME2 | NULL | |
 | final_condition | NVARCHAR(MAX) | NULL | |
@@ -78,9 +78,9 @@
 | Column | Type | Nullable | Constraints |
 |--------|------|----------|-------------|
 | maintenance_id | INT | NOT NULL | PRIMARY KEY, IDENTITY(1,1) |
-| space_code | NVARCHAR(20) | NOT NULL | FK → Space(space_code) |
-| reporter_id | INT | NULL | FK → User(user_id) |
-| assigned_to | INT | NULL | FK → User(user_id) |
+| space_code | NVARCHAR(20) | NOT NULL | FK -> Space(space_code) |
+| reporter_id | INT | NULL | FK -> User(user_id) |
+| assigned_to | INT | NULL | FK -> User(user_id) |
 | problem_description | NVARCHAR(MAX) | NOT NULL | |
 | start_time | DATETIME2 | NOT NULL | |
 | completion_time | DATETIME2 | NULL | |

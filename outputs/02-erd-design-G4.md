@@ -61,7 +61,7 @@ erDiagram
 
     BookingApproval {
         int approval_id PK
-        int booking_id FK UK
+        int booking_id FK, UK
         int staff_id FK
         string decision
         datetime decision_time
@@ -70,7 +70,7 @@ erDiagram
 
     BookingSession {
         int session_id PK
-        int booking_id FK UK
+        int booking_id FK, UK
         datetime actual_start
         int checked_in_by FK
         string initial_condition
@@ -134,6 +134,6 @@ Tracks all repair and upkeep activities for spaces.
 
 ## Notes
 
-- Booking.status and BookingApproval.decision are intentionally separate to support pending → rejected flows without deleting records.
+- Booking.status and BookingApproval.decision are intentionally separate to support pending -> rejected flows without deleting records.
 - BookingSession stores both check-in and check-out data in one table to keep the lifecycle self-contained.
 - User has two relationships to Maintenance (reporter and assignee) — both are optional since the system may record maintenance without linking to a specific user.
