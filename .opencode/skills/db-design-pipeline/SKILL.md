@@ -61,6 +61,10 @@ The document must include:
 
 - A Mermaid `erDiagram`
 - Main entities with identifiers and key attributes
+- You get error : Error: Parse error on line 59:
+...  int booking_id FK UK        int staff
+-----------------------^
+Expecting 'BLOCK_STOP', 'ATTRIBUTE_WORD', ',', 'COMMENT', got 'ATTRIBUTE_KEY'. Checkagain when you try to draw the Diagram. You can also use an online Mermaid live editor to validate the syntax.
 - Relationship names, cardinalities, and participation constraints
 - Notes for optionality, historical tracking, and status-driven behavior
 - Assumptions that affect conceptual design
