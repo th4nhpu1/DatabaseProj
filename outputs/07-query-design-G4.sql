@@ -1,43 +1,206 @@
--- =============================================================
--- Query Design — Campus Space Management System
--- =============================================================
+-- ============================================================================
+-- Campus Space Management System — Query Design
+-- Target DBMS: Microsoft SQL Server
+-- ============================================================================
 
--- -------------------------------------------------------------
--- Query 1: Booking History for a Specific Space
--- -------------------------------------------------------------
--- Business question: What is the complete booking history for
---   the Main Auditorium, including status and approval info?
--- Target users: Facility staff, facility manager, dept admin
--- Usefulness: Allows staff to review past and upcoming bookings
---   for a space, verify utilization, and audit decisions.
+USE CampusSpaceManagement;
+GO
+
+-- ============================================================================
+-- Query 1: Booking history for a specific space
+-- Business question: What is the complete booking history for Auditorium A1?
+-- Target user(s): Facility staff, facility manager
+-- Explanation: Shows all past and future bookings for a space, including status,
+--   requester, and time range — useful for understanding utilization patterns.
+-- ============================================================================
 SELECT
     br.BookingID,
+    u.FullName        AS RequestedBy,
     br.RequestedStartTime,
     br.RequestedEndTime,
     br.Purpose,
-    br.BookingType,
     br.Status,
-    u.FullName AS Requester,
-    a.DecisionTime,
-    a.DecisionNote,
-    a.RejectionReason,
-    s.ActualStartTime,
-    s.ActualEndTime
+    ba.Decision,
+    ba.DecisionNote,
+    bs.ActualStartTime,
+    bs.ActualEndTime
 FROM BookingRequest br
-JOIN [User] u ON br.RequesterID = u.UserID
-LEFT JOIN Approval a ON br.BookingID = a.BookingID
-LEFT JOIN Session s ON br.BookingID = s.BookingID
-WHERE br.SpaceCode = 'CS-AUD-101'
+INNER JOIN [User] u ON u.UserID = br.RequestedBy
+LEFT JOIN BookingApproval ba ON ba.BookingID = br.BookingID
+LEFT JOIN BookingSession bs ON bs.BookingID = br.BookingID
+WHERE br.SpaceID = (SELECT SpaceID FROM Space WHERE SpaceCode = 'LT-A1')
 ORDER BY br.RequestedStartTime DESC;
+GO
 
--- -------------------------------------------------------------
--- Query 2: Upcoming Approved Bookings (Today and Forward)
--- -------------------------------------------------------------
--- Business question: Which approved bookings are scheduled from
---   today onward?
--- Target users: Facility staff (for daily check-in preparation)
--- Usefulness: Helps staff prepare spaces and know what is
---   expected for the day/week.
+-- ============================================================================
+-- Query 2: Upcoming approved bookings for the next 7 days
+-- Business question: Which approved bookings are scheduled for the coming week?
+-- Target user(s): Facility staff, department administrator
+-- Explanation: Helps staff prepare rooms and anticipate usage for the week ahead.
+-- ============================================================================
+SELECT
+    br.BookingID,
+    s.SpaceName,
+    s.SpaceCode,
+    u.FullName        AS RequestedBy,
+    br.RequestedStartTime,
+    br.RequestedEndTime,
+    br.Purpose,
+    br.ExpectedParticipants
+FROM BookingRequest br
+INNER JOIN Space s ON s.SpaceID = br.SpaceID
+INNER JOIN [User] u ON u.UserID = br.RequestedBy
+WHERE br.Status = 'Approved'
+  AND br.RequestedStartTime >= CAST(SYSUTCDATETIME() AS DATE)
+  AND br.RequestedStartTime < DATEADD(DAY, 7, CAST(SYSUTCDATETIME() AS DATE))
+ORDER BY br.RequestedStartTime;
+GO
+
+-- ============================================================================
+-- Query 3: Spaces currently under maintenance
+-- Business question: Which spaces have active maintenance issues right now?
+-- Target user(s): Facility staff, facility manager
+-- Explanation: Identifies spaces that cannot be booked due to maintenance.
+-- ============================================================================
+SELECT
+    s.SpaceCode,
+    s.SpaceName,
+    s.Building,
+    s.RoomNumber,
+    mr.MaintenanceID,
+    mr.ProblemDescription,
+    mr.StartTime,
+    mr.Status,
+    uRep.FullName     AS ReportedBy,
+    uAss.FullName     AS AssignedTo
+FROM MaintenanceRecord mr
+INNER JOIN Space s ON s.SpaceID = mr.SpaceID
+INNER JOIN [User] uRep ON uRep.UserID = mr.ReportedBy
+LEFT JOIN [User] uAss ON uAss.UserID = mr.AssignedTo
+WHERE mr.Status IN ('Reported', 'InProgress')
+ORDER BY mr.StartTime DESC;
+GO
+
+-- ============================================================================
+-- Query 4: Space utilization rate (completed bookings)
+-- Business question: What percentage of time was each space used over the past month?
+-- Target user(s): Facility manager, department administrator
+-- Explanation: Helps assess whether space allocation is efficient and identify
+--   underutilized rooms.
+-- ============================================================================
+SELECT
+    s.SpaceCode,
+    s.SpaceName,
+    s.SpaceType,
+    s.Capacity,
+    COUNT(br.BookingID)                                               AS TotalBookings,
+    ISNULL(SUM(DATEDIFF(MINUTE, br.RequestedStartTime, br.RequestedEndTime)), 0)
+        / 60.0                                                        AS TotalHoursBooked,
+    CASE
+        WHEN COUNT(br.BookingID) = 0 THEN 0.0
+        ELSE ROUND(
+            ISNULL(SUM(DATEDIFF(MINUTE, br.RequestedStartTime, br.RequestedEndTime)), 0)
+            / (COUNT(br.BookingID) * 8.0 * 60.0) * 100, 2
+        )
+    END                                                               AS UtilizationPct
+FROM Space s
+LEFT JOIN BookingRequest br
+    ON br.SpaceID = s.SpaceID
+    AND br.Status IN ('Completed', 'CheckedIn')
+    AND br.RequestedStartTime >= DATEADD(MONTH, -1, SYSUTCDATETIME())
+GROUP BY s.SpaceCode, s.SpaceName, s.SpaceType, s.Capacity
+ORDER BY UtilizationPct DESC;
+GO
+
+-- ============================================================================
+-- Query 5: No-show bookings
+-- Business question: Which bookings were marked as no-show and who made them?
+-- Target user(s): Facility manager, facility staff
+-- Explanation: Identifies users who frequently fail to show up, enabling
+--   follow-up or policy enforcement.
+-- ============================================================================
+SELECT
+    br.BookingID,
+    u.FullName        AS RequestedBy,
+    u.Email,
+    u.Department,
+    s.SpaceName,
+    s.SpaceCode,
+    br.RequestedStartTime,
+    br.RequestedEndTime,
+    br.Purpose
+FROM BookingRequest br
+INNER JOIN [User] u ON u.UserID = br.RequestedBy
+INNER JOIN Space s ON s.SpaceID = br.SpaceID
+WHERE br.Status = 'NoShow'
+ORDER BY br.RequestedStartTime DESC;
+GO
+
+-- ============================================================================
+-- Query 6: Status transition history for a specific booking
+-- Business question: How did a particular booking's status change over time?
+-- Target user(s): Facility staff, facility manager
+-- Explanation: Audits the complete lifecycle of a booking for dispute resolution.
+-- ============================================================================
+SELECT
+    br.BookingID,
+    bsh.FromStatus,
+    bsh.ToStatus,
+    u.FullName        AS ChangedBy,
+    bsh.ChangedAt,
+    bsh.Note
+FROM BookingStatusHistory bsh
+INNER JOIN BookingRequest br ON br.BookingID = bsh.BookingID
+INNER JOIN [User] u ON u.UserID = bsh.ChangedBy
+WHERE br.BookingID = 1
+ORDER BY bsh.ChangedAt;
+GO
+
+-- ============================================================================
+-- Query 7: All facilities in a given space
+-- Business question: What facilities are available in Computer Lab C301?
+-- Target user(s): All users (requesters checking before booking)
+-- Explanation: Helps users select a space that has the equipment they need.
+-- ============================================================================
+SELECT
+    f.FacilityName,
+    sf.Quantity
+FROM SpaceFacility sf
+INNER JOIN Facility f ON f.FacilityID = sf.FacilityID
+INNER JOIN Space s ON s.SpaceID = sf.SpaceID
+WHERE s.SpaceCode = 'CL-C301'
+ORDER BY f.FacilityName;
+GO
+
+-- ============================================================================
+-- Query 8: Maintenance history for a specific space
+-- Business question: What maintenance issues has Classroom B101 had over time?
+-- Target user(s): Facility manager, facility staff
+-- Explanation: Tracks recurring problems for proactive maintenance planning.
+-- ============================================================================
+SELECT
+    mr.MaintenanceID,
+    mr.ProblemDescription,
+    mr.StartTime,
+    mr.CompletionTime,
+    mr.Status,
+    mr.ResultNote,
+    uRep.FullName     AS ReportedBy,
+    uAss.FullName     AS AssignedTo
+FROM MaintenanceRecord mr
+INNER JOIN Space s ON s.SpaceID = mr.SpaceID
+INNER JOIN [User] uRep ON uRep.UserID = mr.ReportedBy
+LEFT JOIN [User] uAss ON uAss.UserID = mr.AssignedTo
+WHERE s.SpaceCode = 'CR-B101'
+ORDER BY mr.StartTime DESC;
+GO
+
+-- ============================================================================
+-- Query 9: Bookings by a specific user
+-- Business question: What bookings has user Nguyễn Văn An made?
+-- Target user(s): Department administrator, facility staff
+-- Explanation: Reviews an individual's booking behavior for policy compliance.
+-- ============================================================================
 SELECT
     br.BookingID,
     s.SpaceName,
@@ -45,113 +208,87 @@ SELECT
     br.RequestedStartTime,
     br.RequestedEndTime,
     br.Purpose,
-    br.BookingType,
-    br.ExpectedParticipants,
-    u.FullName AS Requester,
-    u.Email AS RequesterEmail
+    br.Status,
+    ba.Decision,
+    CASE
+        WHEN bs.ActualStartTime IS NOT NULL THEN 'Yes'
+        ELSE 'No'
+    END               AS WasCheckedIn
 FROM BookingRequest br
-JOIN Space s ON br.SpaceCode = s.SpaceCode
-JOIN [User] u ON br.RequesterID = u.UserID
-WHERE br.Status IN ('Approved', 'CheckedIn')
-  AND br.RequestedStartTime >= CAST(GETDATE() AS DATETIME2)
-ORDER BY br.RequestedStartTime;
-
--- -------------------------------------------------------------
--- Query 3: Spaces Currently Under Maintenance
--- -------------------------------------------------------------
--- Business question: Which spaces have active (unresolved)
---   maintenance issues?
--- Target users: Facility staff, facility manager
--- Usefulness: Identifies spaces that cannot be booked and
---   tracks ongoing maintenance work.
-SELECT
-    sp.SpaceCode,
-    sp.SpaceName,
-    sp.Building,
-    sp.Floor,
-    sp.RoomNumber,
-    m.MaintenanceID,
-    m.ProblemDescription,
-    m.StartTime,
-    m.Status AS MaintenanceStatus,
-    reporter.FullName AS ReportedBy,
-    assigned.FullName AS AssignedTo
-FROM Space sp
-JOIN Maintenance m ON sp.SpaceCode = m.SpaceCode
-JOIN [User] reporter ON m.ReporterID = reporter.UserID
-LEFT JOIN [User] assigned ON m.AssignedStaffID = assigned.UserID
-WHERE m.Status IN ('Reported', 'InProgress')
-ORDER BY m.StartTime;
-
--- -------------------------------------------------------------
--- Query 4: Space Utilization (Completed Bookings by Space)
--- -------------------------------------------------------------
--- Business question: Which spaces had the most completed booking
---   hours in a given month?
--- Target users: Facility manager, dept admin
--- Usefulness: Helps assess which spaces are most heavily used
---   and identify underutilized spaces.
-SELECT
-    sp.SpaceCode,
-    sp.SpaceName,
-    sp.SpaceType,
-    sp.Capacity,
-    COUNT(br.BookingID) AS TotalBookings,
-    SUM(DATEDIFF(HOUR, br.RequestedStartTime, br.RequestedEndTime)) AS TotalHoursBooked,
-    AVG(DATEDIFF(HOUR, br.RequestedStartTime, br.RequestedEndTime)) AS AvgHoursPerBooking
-FROM Space sp
-LEFT JOIN BookingRequest br ON sp.SpaceCode = br.SpaceCode
-    AND br.Status = 'Completed'
-    AND br.RequestedStartTime >= '2026-06-01'
-    AND br.RequestedStartTime < '2026-07-01'
-GROUP BY sp.SpaceCode, sp.SpaceName, sp.SpaceType, sp.Capacity
-ORDER BY TotalHoursBooked DESC;
-
--- -------------------------------------------------------------
--- Query 5: No-Show Bookings
--- -------------------------------------------------------------
--- Business question: Which bookings were marked as no-show,
---   and who was the requester?
--- Target users: Facility manager, facility staff
--- Usefulness: Tracks unreliable users or patterns; helps
---   enforce no-show policies.
-SELECT
-    br.BookingID,
-    br.RequestedStartTime,
-    br.RequestedEndTime,
-    br.Purpose,
-    br.BookingType,
-    u.FullName AS Requester,
-    u.Email AS RequesterEmail,
-    u.Department,
-    s.CheckInBy,
-    s.InitialCondition
-FROM BookingRequest br
-JOIN [User] u ON br.RequesterID = u.UserID
-JOIN Session s ON br.BookingID = s.BookingID
-WHERE br.Status = 'NoShow'
+INNER JOIN Space s ON s.SpaceID = br.SpaceID
+LEFT JOIN BookingApproval ba ON ba.BookingID = br.BookingID
+LEFT JOIN BookingSession bs ON bs.BookingID = br.BookingID
+WHERE br.RequestedBy = (SELECT UserID FROM [User] WHERE Email = 'an.nguyen@school.edu')
 ORDER BY br.RequestedStartTime DESC;
+GO
 
--- -------------------------------------------------------------
--- Query 6: Pending Approvals (for Staff Dashboard)
--- -------------------------------------------------------------
--- Business question: Which bookings are waiting for approval?
--- Target users: Facility staff, facility manager
--- Usefulness: Provides a queue of requests that need action.
+-- ============================================================================
+-- Query 10: Potentially conflicting booking requests (pending overlap check)
+-- Business question: Are there any pending bookings that would conflict with
+--   already-approved bookings for the same space?
+-- Target user(s): Facility staff
+-- Explanation: Flags pending requests that would fail approval due to time
+--   overlap — helps staff reject them proactively.
+-- ============================================================================
 SELECT
-    br.BookingID,
-    sp.SpaceName,
-    sp.SpaceCode,
-    u.FullName AS Requester,
-    u.Role AS RequesterRole,
-    br.RequestedStartTime,
-    br.RequestedEndTime,
-    br.Purpose,
-    br.BookingType,
-    br.ExpectedParticipants,
-    DATEDIFF(DAY, GETDATE(), br.RequestedStartTime) AS DaysUntilBooking
-FROM BookingRequest br
-JOIN Space sp ON br.SpaceCode = sp.SpaceCode
-JOIN [User] u ON br.RequesterID = u.UserID
-WHERE br.Status = 'Pending'
-ORDER BY br.RequestedStartTime;
+    pending.BookingID       AS PendingBookingID,
+    pending.RequestedStartTime AS PendingStart,
+    pending.RequestedEndTime   AS PendingEnd,
+    u.FullName              AS RequestedBy,
+    approved.BookingID      AS ConflictingBookingID,
+    approved.RequestedStartTime AS ConflictingStart,
+    approved.RequestedEndTime   AS ConflictingEnd,
+    s.SpaceName,
+    s.SpaceCode
+FROM BookingRequest pending
+INNER JOIN BookingRequest approved
+    ON approved.SpaceID = pending.SpaceID
+    AND approved.BookingID <> pending.BookingID
+    AND approved.Status IN ('Approved', 'CheckedIn')
+    AND approved.RequestedStartTime < pending.RequestedEndTime
+    AND approved.RequestedEndTime > pending.RequestedStartTime
+INNER JOIN Space s ON s.SpaceID = pending.SpaceID
+INNER JOIN [User] u ON u.UserID = pending.RequestedBy
+WHERE pending.Status = 'Pending'
+ORDER BY pending.RequestedStartTime;
+GO
+
+-- ============================================================================
+-- Query 11: Average booking duration by purpose
+-- Business question: What is the average duration for each type of booking?
+-- Target user(s): Facility manager
+-- Explanation: Helps set scheduling policies and estimate time requirements
+--   for future events.
+-- ============================================================================
+SELECT
+    Purpose,
+    COUNT(*)                                                AS NumberOfBookings,
+    AVG(DATEDIFF(MINUTE, RequestedStartTime, RequestedEndTime))
+        / 60.0                                              AS AvgDurationHours,
+    MIN(DATEDIFF(MINUTE, RequestedStartTime, RequestedEndTime))
+        / 60.0                                              AS MinDurationHours,
+    MAX(DATEDIFF(MINUTE, RequestedStartTime, RequestedEndTime))
+        / 60.0                                              AS MaxDurationHours
+FROM BookingRequest
+WHERE Status NOT IN ('Cancelled', 'Rejected')
+GROUP BY Purpose
+ORDER BY AvgDurationHours DESC;
+GO
+
+-- ============================================================================
+-- Query 12: Staff workload (approvals per staff member)
+-- Business question: How many booking approvals has each facility staff member handled?
+-- Target user(s): Facility manager
+-- Explanation: Monitors workload distribution among facility staff.
+-- ============================================================================
+SELECT
+    u.FullName        AS StaffName,
+    u.Role,
+    COUNT(ba.ApprovalID)                                    AS TotalApprovals,
+    SUM(CASE WHEN ba.Decision = 'Approved' THEN 1 ELSE 0 END) AS ApprovedCount,
+    SUM(CASE WHEN ba.Decision = 'Rejected' THEN 1 ELSE 0 END) AS RejectedCount
+FROM BookingApproval ba
+INNER JOIN [User] u ON u.UserID = ba.ApprovedBy
+GROUP BY u.FullName, u.Role
+ORDER BY TotalApprovals DESC;
+GO

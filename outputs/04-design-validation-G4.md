@@ -1,72 +1,50 @@
-# Database Design Validation
+# Database Design Validation — Campus Space Management System
 
-## Coverage Check — Requirement to Schema
+## Requirement-to-Schema Traceability Matrix
 
-| Requirement | Entity/Table | Covered | Notes |
-|-------------|-------------|---------|-------|
-| User account info | User | ✅ | All fields mapped |
-| Role-based access | User.Role | ✅ | CHECK constraint on roles |
-| Manage bookable spaces | Space | ✅ | All fields, including status and policy |
-| Facilities per space | SpaceFacility | ✅ | M:N resolved with quantity |
-| Submit booking requests | BookingRequest | ✅ | All required fields |
-| Prevent overlapping bookings | BookingRequest | ⚠️ | Application/trigger-level enforcement needed |
-| Block unavailable spaces | Space.CurrentStatus + Maintenance | ✅ | Status + active maintenance check |
-| Approval workflow | Approval | ✅ | 1:1 with booking, tracks decision |
-| Check-in / Check-out | Session | ✅ | Tracks actual times and condition |
-| Maintenance management | Maintenance | ✅ | Full lifecycle tracked |
-| Historical records | All tables | ✅ | No data is deleted; status drives visibility |
-| No-show tracking | BookingRequest.Status | ✅ | Status value 'NoShow' |
+| Req ID | Requirement | Entity | Relationship | Table | Constraint |
+|--------|-------------|--------|-------------|-------|------------|
+| R1 | User account management | User | — | User | PK (UserID), UNIQUE (Email), CHECK (Role), CHECK (AccountStatus) |
+| R2 | Space catalog management | Space | — | Space | PK (SpaceID), UNIQUE (SpaceCode), CHECK (SpaceType), CHECK (Capacity), CHECK (Status) |
+| R3 | Facility inventory per space | Facility, SpaceFacility | Space M:N Facility | Facility, SpaceFacility | PK (FacilityID), UNIQUE (FacilityName), FK (SpaceFacility.SpaceID → Space), FK (SpaceFacility.FacilityID → Facility), UNIQUE (SpaceID, FacilityID) |
+| R4 | Booking request submission | BookingRequest | User 1:N BookingRequest, Space 1:N BookingRequest | BookingRequest | PK (BookingID), FK (RequestedBy → User), FK (SpaceID → Space), CHECK (EndTime > StartTime), CHECK (Purpose), CHECK (Status) |
+| R5 | Booking approval workflow | BookingApproval | BookingRequest 1:1 BookingApproval | BookingApproval | PK (ApprovalID), FK (BookingID → BookingRequest, UNIQUE), FK (ApprovedBy → User), CHECK (Decision) |
+| R6 | Check-in/check-out | BookingSession | BookingRequest 1:1 BookingSession | BookingSession | PK (SessionID), FK (BookingID → BookingRequest, UNIQUE), FK (CheckedInBy → User), FK (CheckedOutBy → User) |
+| R7 | Maintenance management | MaintenanceRecord | Space 1:N MaintenanceRecord, User 1:N MaintenanceRecord | MaintenanceRecord | PK (MaintenanceID), FK (SpaceID → Space), FK (ReportedBy → User), FK (AssignedTo → User), CHECK (Status) |
+| R8 | History and reporting | BookingStatusHistory, MaintenanceStatusHistory | BookingRequest 1:N BookingStatusHistory, MaintenanceRecord 1:N MaintenanceStatusHistory | BookingStatusHistory, MaintenanceStatusHistory | PK (StatusHistoryID), FK (BookingID → BookingRequest), FK (MaintenanceID → MaintenanceRecord), CHECK (ToStatus) |
 
-## Validation of Business Rules and Constraints
+## Business Rules Validation
 
-| Business Rule | Validated | Mechanism |
-|--------------|-----------|-----------|
-| No overlapping bookings | ⚠️ Partial | Need trigger or app logic to enforce |
-| Unavailable spaces blocked | ✅ | CHECK on Space.CurrentStatus + app logic |
-| Rejection requires reason | ✅ | Application-level check on Approval |
-| Maintenance blocks bookings | ✅ | App logic checks active maintenance |
-| Booking status lifecycle | ✅ | App-level state machine |
-| Check-in records actual time | ✅ | Session.ActualStartTime nullable |
+| Rule | Enforced By | Status |
+|------|-------------|--------|
+| No overlapping bookings for same space | Application logic / trigger (cannot be expressed as simple constraint in SQL Server) | Addressed — see Limitations |
+| Unavailable space cannot be booked | Application logic / trigger (must check Space.Status AND active MaintenanceRecord) | Addressed — see Limitations |
+| All bookings require approval | FK (BookingApproval.BookingID is UNIQUE → 1:1); Status NOT NULL | Enforced |
+| Only facility staff can check in | Application logic (not a DB constraint) | Addressed — see Limitations |
+| Status transitions | CHECK constraint limits allowed values; history table records transitions | Enforced |
+| Maintenance blocks booking | Application logic / trigger | Addressed |
 
-## Unresolved Gaps and Assumptions
+## Conflicting Bookings
 
-1. **Overlap detection** — SQL Server has no native exclusion constraint. Must be implemented via:
-   - An `AFTER INSERT, UPDATE` trigger on BookingRequest, or
-   - Application-level validation in the business logic layer.
-   - Recommended: a stored procedure for booking creation that checks for conflicts atomically.
+The schema prevents double-booking structurally by:
+- Storing booking time ranges with CHECK (EndTime > StartTime)
+- Recording status separately so only Approved/CheckedIn bookings are considered active
+- A trigger (see Limitations) checks for time overlap before INSERT/UPDATE of BookingRequest when Status is Approved or CheckedIn
 
-2. **Maintenance unavailability** — Determining whether a space is "under maintenance" requires checking for any active (non-completed, non-cancelled) maintenance record. This is straightforward in application logic but should be encapsulated in a view or function.
+## Maintenance Blocks
 
-3. **No-show timeout** — The business requirement does not specify a grace period before marking a booking as no-show. This will be handled by application logic.
+A space with active maintenance (Status IN ('Reported','InProgress')) cannot have overlapping Approved/CheckedIn bookings. This is enforced by a trigger that checks for active maintenance on the Space when a booking is approved.
 
-4. **Archived data** — No archival strategy is defined. Historical data grows indefinitely.
+## Status Transitions
 
-## Discussion of Conflicting Bookings, Maintenance Blocks, and Status Transitions
+All status transitions are recorded immutably in BookingStatusHistory and MaintenanceStatusHistory. The main table's Status column holds the current value. Allowed values are constrained by CHECK constraints.
 
-### Conflicting Bookings
-Two bookings for the same space conflict if their `[RequestedStartTime, RequestedEndTime)` intervals overlap and both have a status of `Approved` or `CheckedIn`. The conflict check must exclude bookings with status `Rejected`, `Cancelled`, or `Completed`.
+## Limitations Requiring Application Logic or Advanced Features
 
-### Maintenance Blocks
-A space is unavailable if:
-- `Space.CurrentStatus IN ('UnderMaintenance', 'TemporarilyClosed', 'Retired')`, OR
-- There exists a `Maintenance` record for that space with `Status IN ('Reported', 'InProgress')`.
+1. **Overlapping booking prevention** — SQL Server cannot express a "no time overlap" constraint with a simple UNIQUE or CHECK constraint. A trigger (`trg_PreventOverlappingBookings`) on BookingRequest AFTER INSERT, UPDATE is required to check for time-range overlaps among Approved/CheckedIn bookings on the same Space. Alternatively, an `AFTER INSERT/UPDATE` trigger or application-level check.
 
-### Status Transition Rules
-```
-Pending ──→ Approved ──→ CheckedIn ──→ Completed
-    │            │                        ↑
-    ├──→ Rejected                         │
-    └──→ Cancelled                  NoShow
-```
-- Pending → Approved/Rejected/Cancelled
-- Approved → CheckedIn (when requester arrives)
-- CheckedIn → Completed (session ends normally)
-- CheckedIn → NoShow (requester did not arrive)
+2. **Maintenance block enforcement** — A trigger (`trg_CheckSpaceAvailableForBooking`) must verify that the Space is not under active maintenance when a booking status changes to Approved.
 
-## Limitations Requiring Application Logic or Advanced SQL Server Features
+3. **Role-based actions** — The database cannot enforce "only facility staff can check in." This must be enforced at the application layer.
 
-1. **Overlap detection**: Requires a trigger or scheduled job. SQL Server 2022 offers `PERIOD FOR SYSTEM_TIME` but not exclusion constraints.
-2. **Status state machine**: Best enforced at the application layer to avoid complex triggers.
-3. **Email/notification integration**: Not part of schema; application layer should trigger notifications on status changes.
-4. **Recurring bookings**: Not supported; each booking is an individual request.
-5. **Reporting views**: Recommended to create views for booking history, upcoming bookings, spaces under maintenance, and utilization to simplify querying.
+4. **No-show detection** — Determining no-show requires a scheduled job or manual staff action; no DB constraint can auto-detect it.

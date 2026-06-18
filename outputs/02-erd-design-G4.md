@@ -1,134 +1,182 @@
-# Conceptual Design — ERD
+# Conceptual Design / ERD — Campus Space Management System
 
 ## Mermaid ER Diagram
 
 ```mermaid
 erDiagram
-    User ||--o{ BookingRequest : submits
-    User ||--o{ Maintenance : reports
-    User ||--o{ Maintenance : assigned
+    User ||--o{ BookingRequest : requests
+    User ||--o{ BookingApproval : approves
+    User ||--o{ BookingSession : "checks in/out"
+    User ||--o{ MaintenanceRecord : "reports / is assigned"
+    BookingRequest ||--|| BookingApproval : "has approval"
+    BookingRequest ||--|| BookingSession : "has session"
+    BookingRequest ||--o{ BookingStatusHistory : "has history"
     Space ||--o{ BookingRequest : "is booked in"
-    Space ||--o{ SpaceFacility : contains
-    Space ||--o{ Maintenance : "has maintenance"
-    Facility ||--o{ SpaceFacility : "is installed in"
-    BookingRequest ||--o| Approval : "has approval"
-    BookingRequest ||--o| Session : "has session"
+    Space ||--o{ SpaceFacility : "contains"
+    Space ||--o{ MaintenanceRecord : "undergoes"
+    Facility ||--o{ SpaceFacility : "appears in"
+    MaintenanceRecord ||--o{ MaintenanceStatusHistory : "has history"
 
     User {
         int UserID PK
-        string FullName
-        string Email
-        string Phone
-        string Role
-        string Department
-        string AccountStatus
+        nvarchar FullName
+        nvarchar Email UK
+        nvarchar Phone
+        nvarchar Role
+        nvarchar Department
+        nvarchar AccountStatus
     }
 
     Space {
-        string SpaceCode PK
-        string SpaceName
-        string SpaceType
-        string Building
+        int SpaceID PK
+        nvarchar SpaceCode UK
+        nvarchar SpaceName
+        nvarchar SpaceType
+        nvarchar Building
         int Floor
-        string RoomNumber
+        nvarchar RoomNumber
         int Capacity
-        string CurrentStatus
-        string UsagePolicy
+        nvarchar Status
+        nvarchar UsagePolicy
     }
 
     Facility {
         int FacilityID PK
-        string FacilityName
+        nvarchar FacilityName UK
     }
 
     SpaceFacility {
-        int SpaceCode FK
+        int SpaceFacilityID PK
+        int SpaceID FK
         int FacilityID FK
         int Quantity
     }
 
     BookingRequest {
         int BookingID PK
-        string SpaceCode FK
-        int RequesterID FK
-        datetime RequestedStartTime
-        datetime RequestedEndTime
-        string Purpose
+        int RequestedBy FK
+        int SpaceID FK
+        datetime2 RequestedStartTime
+        datetime2 RequestedEndTime
+        nvarchar Purpose
         int ExpectedParticipants
-        string BookingType
-        string Status
+        nvarchar Status
     }
 
-    Approval {
+    BookingApproval {
         int ApprovalID PK
-        int BookingID FK
-        int StaffID FK
-        datetime DecisionTime
-        string DecisionNote
-        string RejectionReason
+        int BookingID FK UK
+        int ApprovedBy FK
+        datetime2 DecisionTime
+        nvarchar Decision
+        nvarchar DecisionNote
+        nvarchar RejectionReason
     }
 
-    Session {
+    BookingSession {
         int SessionID PK
-        int BookingID FK
-        datetime ActualStartTime
-        datetime ActualEndTime
-        int CheckInBy FK
-        string InitialCondition
-        string FinalCondition
-        string UsageNotes
+        int BookingID FK UK
+        int CheckedInBy FK
+        datetime2 ActualStartTime
+        nvarchar InitialCondition
+        int CheckedOutBy FK
+        datetime2 ActualEndTime
+        nvarchar FinalCondition
+        nvarchar UsageNotes
     }
 
-    Maintenance {
+    BookingStatusHistory {
+        int StatusHistoryID PK
+        int BookingID FK
+        nvarchar FromStatus
+        nvarchar ToStatus
+        int ChangedBy FK
+        datetime2 ChangedAt
+        nvarchar Note
+    }
+
+    MaintenanceRecord {
         int MaintenanceID PK
-        string SpaceCode FK
-        int ReporterID FK
-        int AssignedStaffID FK
-        string ProblemDescription
-        datetime StartTime
-        datetime CompletionTime
-        string Status
-        string ResultNote
+        int SpaceID FK
+        int ReportedBy FK
+        int AssignedTo FK
+        nvarchar ProblemDescription
+        datetime2 StartTime
+        datetime2 CompletionTime
+        nvarchar Status
+        nvarchar ResultNote
+    }
+
+    MaintenanceStatusHistory {
+        int StatusHistoryID PK
+        int MaintenanceID FK
+        nvarchar FromStatus
+        nvarchar ToStatus
+        int ChangedBy FK
+        datetime2 ChangedAt
+        nvarchar Note
     }
 ```
 
-## Main Entities with Identifiers and Key Attributes
+## Entity Details
 
-| Entity | Identifier | Key Attributes |
-|--------|-----------|----------------|
-| User | UserID (int, PK) | FullName, Email, Role, AccountStatus |
-| Space | SpaceCode (string, PK) | SpaceName, SpaceType, Capacity, CurrentStatus |
-| Facility | FacilityID (int, PK) | FacilityName |
-| SpaceFacility | Composite (SpaceCode, FacilityID) | Quantity |
-| BookingRequest | BookingID (int, PK) | RequestedStartTime, RequestedEndTime, Status |
-| Approval | ApprovalID (int, PK) | DecisionTime, DecisionNote |
-| Session | SessionID (int, PK) | ActualStartTime, ActualEndTime |
-| Maintenance | MaintenanceID (int, PK) | ProblemDescription, StartTime, Status |
+### User
+- **Identifier**: UserID (surrogate)
+- **Key attributes**: FullName, Email (unique), Phone, Role, Department, AccountStatus
+- **Optional**: none
 
-## Relationship Names, Cardinalities, and Participation Constraints
+### Space
+- **Identifier**: SpaceID (surrogate); SpaceCode is an alternate key
+- **Key attributes**: SpaceName, SpaceType, Building, Floor, RoomNumber, Capacity, Status, UsagePolicy
+- **Optional**: UsagePolicy
 
-| Relationship | From | To | Cardinality | Participation |
-|-------------|------|----|-------------|---------------|
-| submits | User | BookingRequest | 1:N | User: optional, BookingRequest: mandatory |
-| reports | User | Maintenance | 1:N | User: optional, Maintenance: mandatory |
-| assigned | User | Maintenance | 1:N | User: optional, Maintenance: optional |
-| is booked in | Space | BookingRequest | 1:N | Space: optional, BookingRequest: mandatory |
-| contains | Space | SpaceFacility | 1:N | Space: mandatory, SpaceFacility: mandatory |
-| is installed in | Facility | SpaceFacility | 1:N | Facility: optional, SpaceFacility: mandatory |
-| has maintenance | Space | Maintenance | 1:N | Space: optional, Maintenance: mandatory |
-| has approval | BookingRequest | Approval | 1:1 | BookingRequest: optional, Approval: mandatory |
-| has session | BookingRequest | Session | 1:1 | BookingRequest: optional, Session: optional |
+### Facility (lookup)
+- **Identifier**: FacilityID (surrogate); FacilityName is an alternate key
+- **Purpose**: Normalized list of facility types
 
-## Notes
+### SpaceFacility (junction)
+- **Purpose**: Links facilities to spaces with quantity
+- **Cardinality**: Many-to-many between Space and Facility resolved to one-to-many from each side
 
-- **Optionality**: Approval is mandatory for every approved booking; Session is optional (only recorded when check-in occurs).
-- **Historical tracking**: Completed and cancelled bookings remain in the database; Status field drives visibility.
-- **Status-driven behavior**: Space.CurrentStatus controls bookability; BookingRequest.Status controls lifecycle.
-- **Many-to-many**: Space ↔ Facility is resolved via the associative entity SpaceFacility.
+### BookingRequest
+- **Identifier**: BookingID (surrogate)
+- **Status lifecycle**: Pending → Approved/Rejected/Cancelled → CheckedIn → Completed/NoShow
+- **History**: Tracked via BookingStatusHistory (dedicated history table, not temporal table)
 
-## Assumptions
+### BookingApproval
+- **Identifier**: ApprovalID (surrogate)
+- **One-to-one** with BookingRequest (BookingID is UNIQUE)
 
-1. A Space can have zero or more Facilities; a Facility can exist in zero or more Spaces (many-to-many via SpaceFacility).
-2. Approval is 1:1 with BookingRequest — a booking receives exactly one approval/rejection decision.
-3. Session is 1:1 with BookingRequest — each booking has at most one check-in/check-out record.
-4. A maintenance record is assigned to exactly one staff member; a staff member can handle many maintenance records.
+### BookingSession
+- **Identifier**: SessionID (surrogate)
+- **One-to-one** with BookingRequest (BookingID is UNIQUE)
+- CheckedOutBy, ActualEndTime, FinalCondition, UsageNotes are nullable until check-out occurs
+
+### BookingStatusHistory
+- **Purpose**: Immutable log of every status transition for a booking
+- **FromStatus** is NULL for the initial Pending entry
+
+### MaintenanceRecord
+- **Identifier**: MaintenanceID (surrogate)
+- **Status lifecycle**: Reported → InProgress → Completed/Cancelled
+- **Optional**: AssignedTo, CompletionTime, ResultNote are nullable until assigned/completed
+
+### MaintenanceStatusHistory
+- **Purpose**: Immutable log of every status transition for a maintenance record
+
+## History Tracking Approach
+
+**Dedicated history tables** (`BookingStatusHistory`, `MaintenanceStatusHistory`) are used rather than SQL Server temporal tables. This provides explicit control over what is recorded, allows custom notes per transition, and keeps the main tables lightweight.
+
+## Conflict and Constraint Representation
+
+- **Overlapping bookings**: Enforced via a database trigger that checks for time overlap on Approved/CheckedIn bookings for the same space (cannot be done with a simple unique constraint in SQL Server).
+- **Maintenance blocks**: Enforced via a database trigger that checks if the target space has active (non-Completed/non-Cancelled) maintenance before allowing a booking to be Approved.
+- **Status transitions**: Enforced via CHECK constraints on the Status column in BookingRequest and MaintenanceRecord, and the history tables record every transition immutably.
+
+## Assumptions Affecting Conceptual Design
+
+- All bookings require approval (no concept of "auto-approved" or "no-approval-needed" bookings).
+- A booking moves directly from Approved to CheckedIn (no intermediate states).
+- No-show is determined by absence of check-in; the system does not auto-transition — a staff member marks it.
+- Facilities are shared across spaces via a junction table, not stored as a JSON list.

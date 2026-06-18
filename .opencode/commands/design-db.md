@@ -24,4 +24,6 @@ Run the full Phase 1 pipeline and generate or update all required outputs in `ou
 6. `06-sample-data-G4.sql`
 7. `07-query-design-G4.sql`
 
+Verify that the outputs are consistent with the PDF instructions, the repository AGENTS file, and the database design skill rules. If there are any contradictions or gaps, fix them before proceeding to the next step.
+
 Keep the deliverables consistent with the PDF instructions, the repository AGENTS file, and the database design skill rules.

@@ -1,141 +1,183 @@
-# Logical Database Design
+# Logical Database Design — Campus Space Management System
 
-## Relations with Attributes
+## Relations and Attributes
+
+All tables use **PascalCase** naming. Surrogate integer `IDENTITY` primary keys are used throughout.
 
 ### User
-| Column | Type | Nullable | Notes |
-|--------|------|----------|-------|
-| UserID | INT | NOT NULL | PK, identity |
-| FullName | NVARCHAR(100) | NOT NULL | |
-| Email | NVARCHAR(255) | NOT NULL | UQ |
-| Phone | NVARCHAR(20) | NULL | |
-| Role | NVARCHAR(50) | NOT NULL | CHECK IN (Student, Lecturer, TA, FacilityStaff, DeptAdmin, FacilityManager) |
-| Department | NVARCHAR(100) | NOT NULL | |
-| AccountStatus | NVARCHAR(20) | NOT NULL | CHECK IN (Active, Inactive, Suspended), DEFAULT 'Active' |
+| Column | Type | Nullable | Constraints |
+|--------|------|----------|-------------|
+| UserID | int | NOT NULL | PK, IDENTITY(1,1) |
+| FullName | nvarchar(100) | NOT NULL | |
+| Email | nvarchar(255) | NOT NULL | UNIQUE |
+| Phone | nvarchar(20) | NULL | |
+| Role | nvarchar(30) | NOT NULL | CHECK (Role IN ('Student','Lecturer','TeachingAssistant','FacilityStaff','DepartmentAdministrator','FacilityManager')) |
+| Department | nvarchar(100) | NOT NULL | |
+| AccountStatus | nvarchar(20) | NOT NULL | DEFAULT 'Active', CHECK (AccountStatus IN ('Active','Inactive')) |
+| CreatedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
+| ModifiedAt | datetime2 | NULL | |
+| IsActive | bit | NOT NULL | DEFAULT 1 |
+| DeletedAt | datetime2 | NULL | |
+
+**Delete policy**: Soft-delete (IsActive, DeletedAt)
 
 ### Space
-| Column | Type | Nullable | Notes |
-|--------|------|----------|-------|
-| SpaceCode | NVARCHAR(20) | NOT NULL | PK |
-| SpaceName | NVARCHAR(100) | NOT NULL | |
-| SpaceType | NVARCHAR(50) | NOT NULL | CHECK IN (Auditorium, Classroom, ComputerLab, ProjectLab, MeetingRoom, StudentWorkspace) |
-| Building | NVARCHAR(100) | NOT NULL | |
-| Floor | INT | NOT NULL | |
-| RoomNumber | NVARCHAR(20) | NOT NULL | |
-| Capacity | INT | NOT NULL | CHECK > 0 |
-| CurrentStatus | NVARCHAR(30) | NOT NULL | CHECK IN (Available, InUse, UnderMaintenance, TemporarilyClosed, Retired) |
-| UsagePolicy | NVARCHAR(MAX) | NULL | Free-text policy |
+| Column | Type | Nullable | Constraints |
+|--------|------|----------|-------------|
+| SpaceID | int | NOT NULL | PK, IDENTITY(1,1) |
+| SpaceCode | nvarchar(20) | NOT NULL | UNIQUE |
+| SpaceName | nvarchar(100) | NOT NULL | |
+| SpaceType | nvarchar(30) | NOT NULL | CHECK (SpaceType IN ('Auditorium','Classroom','ComputerLaboratory','ProjectLaboratory','MeetingRoom','StudentWorkspace')) |
+| Building | nvarchar(100) | NOT NULL | |
+| Floor | int | NOT NULL | |
+| RoomNumber | nvarchar(20) | NOT NULL | |
+| Capacity | int | NOT NULL | CHECK (Capacity > 0) |
+| Status | nvarchar(30) | NOT NULL | DEFAULT 'Available', CHECK (Status IN ('Available','InUse','UnderMaintenance','TemporarilyClosed','Retired')) |
+| UsagePolicy | nvarchar(500) | NULL | |
+| CreatedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
+| ModifiedAt | datetime2 | NULL | |
+| IsActive | bit | NOT NULL | DEFAULT 1 |
+| DeletedAt | datetime2 | NULL | |
+
+**Delete policy**: Soft-delete (IsActive, DeletedAt)
 
 ### Facility
-| Column | Type | Nullable | Notes |
-|--------|------|----------|-------|
-| FacilityID | INT | NOT NULL | PK, identity |
-| FacilityName | NVARCHAR(100) | NOT NULL | UQ |
+| Column | Type | Nullable | Constraints |
+|--------|------|----------|-------------|
+| FacilityID | int | NOT NULL | PK, IDENTITY(1,1) |
+| FacilityName | nvarchar(100) | NOT NULL | UNIQUE |
+| CreatedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
+| ModifiedAt | datetime2 | NULL | |
+
+**Delete policy**: Soft-delete not needed — transient lookup data.
 
 ### SpaceFacility
-| Column | Type | Nullable | Notes |
-|--------|------|----------|-------|
-| SpaceCode | NVARCHAR(20) | NOT NULL | PK, FK → Space |
-| FacilityID | INT | NOT NULL | PK, FK → Facility |
-| Quantity | INT | NOT NULL | DEFAULT 1, CHECK > 0 |
+| Column | Type | Nullable | Constraints |
+|--------|------|----------|-------------|
+| SpaceFacilityID | int | NOT NULL | PK, IDENTITY(1,1) |
+| SpaceID | int | NOT NULL | FK → Space.SpaceID |
+| FacilityID | int | NOT NULL | FK → Facility.FacilityID |
+| Quantity | int | NOT NULL | DEFAULT 1, CHECK (Quantity > 0) |
+| CreatedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
+| ModifiedAt | datetime2 | NULL | |
+
+**Unique constraint**: (SpaceID, FacilityID)
+**Delete policy**: Hard-delete (transient junction data)
 
 ### BookingRequest
-| Column | Type | Nullable | Notes |
-|--------|------|----------|-------|
-| BookingID | INT | NOT NULL | PK, identity |
-| SpaceCode | NVARCHAR(20) | NOT NULL | FK → Space |
-| RequesterID | INT | NOT NULL | FK → User |
-| RequestedStartTime | DATETIME2 | NOT NULL | |
-| RequestedEndTime | DATETIME2 | NOT NULL | CHECK > RequestedStartTime |
-| Purpose | NVARCHAR(MAX) | NOT NULL | |
-| ExpectedParticipants | INT | NOT NULL | CHECK > 0 |
-| BookingType | NVARCHAR(50) | NOT NULL | CHECK IN (Lecture, Examination, Seminar, Workshop, Meeting, StudentActivity, AdminEvent) |
-| Status | NVARCHAR(20) | NOT NULL | CHECK IN (Pending, Approved, Rejected, Cancelled, CheckedIn, Completed, NoShow), DEFAULT 'Pending' |
+| Column | Type | Nullable | Constraints |
+|--------|------|----------|-------------|
+| BookingID | int | NOT NULL | PK, IDENTITY(1,1) |
+| RequestedBy | int | NOT NULL | FK → User.UserID |
+| SpaceID | int | NOT NULL | FK → Space.SpaceID |
+| RequestedStartTime | datetime2 | NOT NULL | |
+| RequestedEndTime | datetime2 | NOT NULL | CHECK (RequestedEndTime > RequestedStartTime) |
+| Purpose | nvarchar(30) | NOT NULL | CHECK (Purpose IN ('Lecture','Examination','Seminar','Workshop','Meeting','StudentActivity','AdministrativeEvent')) |
+| ExpectedParticipants | int | NOT NULL | CHECK (ExpectedParticipants > 0) |
+| Status | nvarchar(20) | NOT NULL | DEFAULT 'Pending', CHECK (Status IN ('Pending','Approved','Rejected','Cancelled','CheckedIn','Completed','NoShow')) |
+| CreatedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
+| ModifiedAt | datetime2 | NULL | |
 
-### Approval
-| Column | Type | Nullable | Notes |
-|--------|------|----------|-------|
-| ApprovalID | INT | NOT NULL | PK, identity |
-| BookingID | INT | NOT NULL | FK → BookingRequest, UQ |
-| StaffID | INT | NOT NULL | FK → User |
-| DecisionTime | DATETIME2 | NOT NULL | DEFAULT GETDATE() |
-| DecisionNote | NVARCHAR(MAX) | NULL | |
-| RejectionReason | NVARCHAR(MAX) | NULL | Required when Decision = Rejected |
+**Delete policy**: Hard-delete (transactional data; history preserved in BookingStatusHistory)
 
-### Session
-| Column | Type | Nullable | Notes |
-|--------|------|----------|-------|
-| SessionID | INT | NOT NULL | PK, identity |
-| BookingID | INT | NOT NULL | FK → BookingRequest, UQ |
-| ActualStartTime | DATETIME2 | NULL | Set on check-in |
-| ActualEndTime | DATETIME2 | NULL | Set on completion |
-| CheckInBy | INT | NULL | FK → User |
-| InitialCondition | NVARCHAR(MAX) | NULL | |
-| FinalCondition | NVARCHAR(MAX) | NULL | |
-| UsageNotes | NVARCHAR(MAX) | NULL | |
+### BookingApproval
+| Column | Type | Nullable | Constraints |
+|--------|------|----------|-------------|
+| ApprovalID | int | NOT NULL | PK, IDENTITY(1,1) |
+| BookingID | int | NOT NULL | FK → BookingRequest.BookingID, UNIQUE |
+| ApprovedBy | int | NOT NULL | FK → User.UserID |
+| DecisionTime | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
+| Decision | nvarchar(10) | NOT NULL | CHECK (Decision IN ('Approved','Rejected')) |
+| DecisionNote | nvarchar(500) | NULL | |
+| RejectionReason | nvarchar(500) | NULL | |
+| CreatedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
 
-### Maintenance
-| Column | Type | Nullable | Notes |
-|--------|------|----------|-------|
-| MaintenanceID | INT | NOT NULL | PK, identity |
-| SpaceCode | NVARCHAR(20) | NOT NULL | FK → Space |
-| ReporterID | INT | NOT NULL | FK → User |
-| AssignedStaffID | INT | NULL | FK → User |
-| ProblemDescription | NVARCHAR(MAX) | NOT NULL | |
-| StartTime | DATETIME2 | NOT NULL | |
-| CompletionTime | DATETIME2 | NULL | |
-| Status | NVARCHAR(30) | NOT NULL | CHECK IN (Reported, InProgress, Completed, Cancelled), DEFAULT 'Reported' |
-| ResultNote | NVARCHAR(MAX) | NULL | |
+**Delete policy**: Hard-delete (transactional audit data)
 
-## Primary Keys and Foreign Keys Summary
+### BookingSession
+| Column | Type | Nullable | Constraints |
+|--------|------|----------|-------------|
+| SessionID | int | NOT NULL | PK, IDENTITY(1,1) |
+| BookingID | int | NOT NULL | FK → BookingRequest.BookingID, UNIQUE |
+| CheckedInBy | int | NOT NULL | FK → User.UserID |
+| ActualStartTime | datetime2 | NOT NULL | |
+| InitialCondition | nvarchar(500) | NULL | |
+| CheckedOutBy | int | NULL | FK → User.UserID |
+| ActualEndTime | datetime2 | NULL | CHECK (ActualEndTime IS NULL OR ActualEndTime > ActualStartTime) |
+| FinalCondition | nvarchar(500) | NULL | |
+| UsageNotes | nvarchar(1000) | NULL | |
+| CreatedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
+| ModifiedAt | datetime2 | NULL | |
 
-| Table | Primary Key | Foreign Keys |
-|-------|-------------|--------------|
-| User | UserID | — |
-| Space | SpaceCode | — |
-| Facility | FacilityID | — |
-| SpaceFacility | (SpaceCode, FacilityID) | SpaceCode → Space, FacilityID → Facility |
-| BookingRequest | BookingID | SpaceCode → Space, RequesterID → User |
-| Approval | ApprovalID | BookingID → BookingRequest, StaffID → User |
-| Session | SessionID | BookingID → BookingRequest, CheckInBy → User |
-| Maintenance | MaintenanceID | SpaceCode → Space, ReporterID → User, AssignedStaffID → User |
+**Delete policy**: Hard-delete (transactional session data)
 
-## Candidate Keys and Alternate Keys
+### BookingStatusHistory
+| Column | Type | Nullable | Constraints |
+|--------|------|----------|-------------|
+| StatusHistoryID | int | NOT NULL | PK, IDENTITY(1,1) |
+| BookingID | int | NOT NULL | FK → BookingRequest.BookingID |
+| FromStatus | nvarchar(20) | NULL | |
+| ToStatus | nvarchar(20) | NOT NULL | CHECK (ToStatus IN ('Pending','Approved','Rejected','Cancelled','CheckedIn','Completed','NoShow')) |
+| ChangedBy | int | NOT NULL | FK → User.UserID |
+| ChangedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
+| Note | nvarchar(500) | NULL | |
+| CreatedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
 
-- **User.Email** — candidate key (alternate unique key)
-- **Facility.FacilityName** — candidate key (alternate unique key)
-- **Approval.BookingID** — alternate key (1:1 with BookingRequest)
-- **Session.BookingID** — alternate key (1:1 with BookingRequest)
+**Delete policy**: Hard-delete (immutable audit log)
 
-## Nullability and Uniqueness Decisions
+### MaintenanceRecord
+| Column | Type | Nullable | Constraints |
+|--------|------|----------|-------------|
+| MaintenanceID | int | NOT NULL | PK, IDENTITY(1,1) |
+| SpaceID | int | NOT NULL | FK → Space.SpaceID |
+| ReportedBy | int | NOT NULL | FK → User.UserID |
+| AssignedTo | int | NULL | FK → User.UserID |
+| ProblemDescription | nvarchar(1000) | NOT NULL | |
+| StartTime | datetime2 | NOT NULL | |
+| CompletionTime | datetime2 | NULL | |
+| Status | nvarchar(20) | NOT NULL | DEFAULT 'Reported', CHECK (Status IN ('Reported','InProgress','Completed','Cancelled')) |
+| ResultNote | nvarchar(1000) | NULL | |
+| CreatedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
+| ModifiedAt | datetime2 | NULL | |
 
-| Column | Nullable Rationale |
-|--------|-------------------|
-| User.Phone | Optional contact info |
-| Approval.RejectionReason | Only required when rejected |
-| Session.ActualStartTime | NULL until check-in occurs |
-| Session.ActualEndTime | NULL until session completes |
-| Session.CheckInBy | NULL until check-in |
-| Session.*Condition | NULL until recorded |
-| Maintenance.AssignedStaffID | NULL until assignment |
-| Maintenance.CompletionTime | NULL until completed |
-| Maintenance.ResultNote | NULL until resolved |
+**Delete policy**: Hard-delete (transactional data; history in MaintenanceStatusHistory)
 
-## Mapping Notes from Conceptual Entities/Relationships
+### MaintenanceStatusHistory
+| Column | Type | Nullable | Constraints |
+|--------|------|----------|-------------|
+| StatusHistoryID | int | NOT NULL | PK, IDENTITY(1,1) |
+| MaintenanceID | int | NOT NULL | FK → MaintenanceRecord.MaintenanceID |
+| FromStatus | nvarchar(20) | NULL | |
+| ToStatus | nvarchar(20) | NOT NULL | CHECK (ToStatus IN ('Reported','InProgress','Completed','Cancelled')) |
+| ChangedBy | int | NOT NULL | FK → User.UserID |
+| ChangedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
+| Note | nvarchar(500) | NULL | |
+| CreatedAt | datetime2 | NOT NULL | DEFAULT SYSUTCDATETIME() |
+
+**Delete policy**: Hard-delete (immutable audit log)
+
+## Mapping Notes from Conceptual Entities
 
 | Conceptual Entity | Logical Relation | Notes |
 |-------------------|-----------------|-------|
 | User | User | Direct mapping |
 | Space | Space | Direct mapping |
-| Facility | Facility | Direct mapping |
-| SpaceFacility (associative) | SpaceFacility | Resolves M:N |
+| Facility | Facility | Lookup table |
+| SpaceFacility | SpaceFacility | Junction table resolving M:N |
 | BookingRequest | BookingRequest | Direct mapping |
-| Approval | Approval | 1:1 weak entity |
-| Session | Session | 1:1 weak entity |
-| Maintenance | Maintenance | Direct mapping |
+| BookingApproval | BookingApproval | 1:1 with BookingRequest via UNIQUE FK |
+| BookingSession | BookingSession | 1:1 with BookingRequest via UNIQUE FK |
+| BookingStatusHistory | BookingStatusHistory | History table for booking status |
+| MaintenanceRecord | MaintenanceRecord | Direct mapping |
+| MaintenanceStatusHistory | MaintenanceStatusHistory | History table for maintenance status |
 
-## Constraint Rationale
+## Audit Columns Applied
 
-- **Booking overlap prevention**: An application-level or indexed check (or a temporal exclusion constraint) is needed to prevent two approved bookings for the same space with overlapping time ranges. SQL Server does not natively support exclusion constraints; this is enforced via application logic or a trigger.
-- **Maintenance blocks**: Application logic checks Space.CurrentStatus and active Maintenance records before allowing a new booking.
-- **Status lifecycle**: BookingRequest.Status transitions are validated at the application layer (e.g., Pending → Approved → CheckedIn → Completed, or Pending → Rejected/Cancelled).
+All transactional tables (BookingRequest, BookingApproval, BookingSession, BookingStatusHistory, MaintenanceRecord, MaintenanceStatusHistory) include `CreatedAt DATETIME2 DEFAULT SYSUTCDATETIME()` and `ModifiedAt DATETIME2 NULL`.
+
+## Delete Policy Applied
+
+| Policy | Tables |
+|--------|--------|
+| Soft-delete (IsActive, DeletedAt) | User, Space |
+| Hard-delete | Facility, SpaceFacility, BookingRequest, BookingApproval, BookingSession, BookingStatusHistory, MaintenanceRecord, MaintenanceStatusHistory |
