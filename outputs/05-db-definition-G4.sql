@@ -176,3 +176,93 @@ CREATE INDEX IX_Maintenance_space_code ON [Maintenance](space_code);
 CREATE INDEX IX_Maintenance_status ON [Maintenance](status);
 CREATE INDEX IX_BookingApproval_booking_id ON [BookingApproval](booking_id);
 CREATE INDEX IX_BookingSession_booking_id ON [BookingSession](booking_id);
+GO
+-- ============================================================
+-- TRIGGERS
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- Trigger 1: Overlap Prevention
+-- Prevents inserting or updating a booking to 'approved' or
+-- 'checked_in' when another confirmed booking exists for the
+-- same space with overlapping time.
+-- ------------------------------------------------------------
+CREATE TRIGGER TRG_Booking_PreventOverlap
+ON [Booking]
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        WHERE i.status IN ('approved', 'checked_in')
+          AND EXISTS (
+              SELECT 1
+              FROM [Booking] b
+              WHERE b.space_code = i.space_code
+                AND b.booking_id <> i.booking_id
+                AND b.status IN ('approved', 'checked_in')
+                AND b.requested_start < i.requested_end
+                AND b.requested_end > i.requested_start
+          )
+    )
+    BEGIN
+        ROLLBACK TRANSACTION;
+        THROW 50001, 'Booking overlap: the selected space already has a confirmed booking during this time period.', 1;
+    END;
+END;
+GO
+
+-- ------------------------------------------------------------
+-- Trigger 2: Unavailable Space Block
+-- Prevents booking a space whose status is under_maintenance,
+-- temporarily_closed, or retired.
+-- ------------------------------------------------------------
+CREATE TRIGGER TRG_Booking_CheckSpaceAvailable
+ON [Booking]
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN [Space] s ON i.space_code = s.space_code
+        WHERE i.status NOT IN ('rejected', 'cancelled')
+          AND s.status IN ('under_maintenance', 'temporarily_closed', 'retired')
+    )
+    BEGIN
+        ROLLBACK TRANSACTION;
+        THROW 50002, 'Cannot book: the selected space is under maintenance, temporarily closed, or retired.', 1;
+    END;
+END;
+GO
+
+-- ------------------------------------------------------------
+-- Trigger 3: Capacity Enforcement
+-- Prevents booking when expected_participants exceeds the
+-- space capacity.
+-- ------------------------------------------------------------
+CREATE TRIGGER TRG_Booking_CheckCapacity
+ON [Booking]
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN [Space] s ON i.space_code = s.space_code
+        WHERE i.status NOT IN ('rejected', 'cancelled')
+          AND i.expected_participants > s.capacity
+    )
+    BEGIN
+        ROLLBACK TRANSACTION;
+        THROW 50003, 'Capacity exceeded: expected participants exceeds room capacity.', 1;
+    END;
+END;
+GO

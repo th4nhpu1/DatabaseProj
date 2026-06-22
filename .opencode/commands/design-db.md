@@ -15,7 +15,6 @@ If the argument is missing or points to an incomplete requirement file, also rea
 
 
 Run the full Phase 1 pipeline and generate or update all required outputs in `outputs/`:
-
 1. `01-business-req-analysis-G4.md`
 2. `02-erd-design-G4.md`
 3. `03-logical-design-G4.md`

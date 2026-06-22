@@ -105,12 +105,16 @@ Save to `outputs/05-db-definition-G4.sql`.
 
 The script must include:
 
-- `CREATE TABLE` statements
-- Primary keys and foreign keys
-- `CHECK`, `DEFAULT`, and `UNIQUE` constraints where appropriate
-- Data types suitable for SQL Server
-- Any needed lookup tables or seed-independent reference structures
-- Comments only when needed for clarity
+- `CREATE TABLE` statements.
+- Primary keys and foreign keys.
+- `CHECK`, `DEFAULT`, and `UNIQUE` constraints where appropriate.
+- Data types suitable for SQL Server.
+- Any needed lookup tables or seed-independent reference structures.
+- **CRITICAL TRIGGER REQUIREMENTS:** You MUST write `CREATE TRIGGER` statements (e.g., `AFTER INSERT, UPDATE`) to strictly enforce the following business rules that basic constraints cannot handle:
+  1. **Overlap Prevention:** Rollback the transaction if a new or updated `Booking` overlaps in time (`requested_start` to `requested_end`) with any existing 'approved' or 'checked_in' booking for the same `space_code`.
+  2. **Unavailable Space Block:** Rollback the transaction if the booked `space_code` currently has a status of 'under_maintenance', 'temporarily_closed', or 'retired' in the `Space` table.
+  3. **Capacity Enforcement:** Rollback the transaction if the `expected_participants` in the `Booking` table exceeds the `capacity` of the linked `Space`.
+- Comments only when needed for clarity.
 
 # Step 6: Sample Data Preparation
 
@@ -124,6 +128,7 @@ The script must include:
 - Inserts for important edge cases
 - Data that supports bookings, approvals, maintenance, check-in, completion, and no-show scenarios
 - Sample data that helps verify constraint behavior and history reporting
+- **CRITICAL DATA VALIDATION RULE:** The generated sample data MUST NOT violate the trigger rules defined in Step 5. Ensure that no sample bookings have overlapping times for the same space, no sample bookings are assigned to spaces currently under maintenance, and no booking's expected participants exceed the room capacity.
 
 # Step 7: Query Design
 

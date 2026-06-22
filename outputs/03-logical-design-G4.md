@@ -102,7 +102,9 @@
 
 ## Constraint Rationale
 
-- Overlapping approved bookings are prevented by a table-level CHECK or application-level validation (SQL Server does not support regex-based interval overlap checks natively; a trigger or application logic enforces this).
+- Overlapping approved bookings are prevented by trigger TRG_Booking_PreventOverlap, which rolls back INSERT/UPDATE when a confirmed booking conflicts in time for the same space.
+- Unavailable spaces (under_maintenance, temporarily_closed, retired) are blocked by trigger TRG_Booking_CheckSpaceAvailable on INSERT/UPDATE.
+- Capacity enforcement is handled by trigger TRG_Booking_CheckCapacity, which compares expected_participants against Space.capacity on INSERT/UPDATE.
 - CHECK constraints enforce domain values for all status and type columns to prevent invalid state transitions.
 - UNIQUE on BookingApproval.booking_id and BookingSession.booking_id ensures 1:1 relationship cardinality.
 - FK cascading is set to NO ACTION to prevent accidental deletion of historical records.
