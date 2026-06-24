@@ -1,30 +1,28 @@
-## 1. Architectural Standardization and Database Conventions
-- This version introduces a global, upfront configuration baseline that was completely absent in version 1. This ensures architectural consistency across all downstream deliverables:
-- Identifier Strategy: Explicitly standardizes on surrogate primary keys (IDENTITY columns) by default, relegating natural or business keys to UNIQUE constraints.
-- Metadata Auditability: Establishes mandatory system audit columns (CreatedAt DATETIME2 DEFAULT SYSUTCDATETIME() and ModifiedAt DATETIME2 NULL) for all transactional tables to track state progression.
-- Historical Tracking: Mandates explicit database modeling patterns for state/history tracking (using dedicated historical tables or SQL Server temporal tables) rather than mutating statuses in place.
-- Data Retention Policy: Defines explicit delete strategies, standardizing on soft-delete mechanisms (IsActive / DeletedAt) for reference data, and restricting hard-deletes to transient data.
-- Lexical Conventions: Enforces a strict PascalCase naming convention across all relational entities and attributes.
-## 2. Risk Mitigation and Ambiguity Tiering
-- While version 1 recommended continuing with generic assumptions during requirements gaps, this version implements a structured governance protocol for handling system ambiguities:
-- Two-Tier Ambiguity Classification: Gaps are partitioned into Minor Gaps (non-structural items that are resolved via logged assumptions) and Structural Gaps (core business rule changes or schema-altering ambiguities).
-- Escalation Protocol: Structural gaps trigger an immediate execution halt and user escalation mechanism, preventing downstream logic corruption and minimizing rework cycles.
-## 3. Relational Idempotency and State-Awareness
-- This version incorporates operational parameters for execution safety and iterative updates (reruns):
-- State Verification: Prior to design execution, the directory state is mapped via file-system discovery (ls -la) to identify existing artifacts.
-- Idempotent DDL Execution: Requires DROP TABLE IF EXISTS statements in the database definition script, structured in reverse-dependency order, to allow safe, repeatable execution.
-- Downstream Change Propagation: Establishes a strict change management rule: any mutation in an early phase (e.g., conceptual design) must dynamically propagate to and invalidate downstream deliverables (logical design, DDL, queries) to prevent architectural drift.
-- Code Conservation Guard: Prevents the silent clobbering of manually edited files, requiring the system to flag discrepancies before overwriting.
-## 4. Requirement Traceability and Validation Rigor
-- The validation phase (Step 4) is heavily refactored in this version to enforce data integrity and functional correctness:
-- Mandatory Traceability Matrix: Replaces narrative prose validation with a structured, tabular mapping matrix (Requirement ID  Entity  Relationship  Table  Constraint).
-- Procedural Guardrails: Introduces a strict feedback loop. If the validation step identifies structural gaps, contradictions, or design limitations, the protocol mandates a rollback to Steps 1–3 to correct the schema before generating the SQL definition.
-## 5. Script Optimization and Deliverable Expansion
-- The final relational script deliverables (Steps 5, 6, and 7) are expanded to ensure comprehensive testing and localization:
-- Database Isolation: Adds CREATE DATABASE safety logic to prevent namespace conflicts by dynamically utilizing version-controlled schemas (e.g., CampusSpaceManagement_v2).
-- Seed Data Alignment & Localization: Mandates that sample data reflect local Vietnamese contexts where appropriate and requires strict transactional alignment with query files to guarantee non-empty result sets during testing.
-- Expanded Query Coverage: Doubles the deliverable requirement from a minimum of five queries in version 1 to a minimum of ten complex queries in this version, specifically targeting high-complexity scenarios (e.g., resource utilization, concurrent booking conflicts, and status transitions).
-## 6. Execution Verification Loop and Definition of Done (DoD)
-- This version closes the development lifecycle with an automated execution verification phase (Step 8) and a formal Definition of Done (DoD):
-- Compilation and Integration Testing: Requires a full compilation check of the generated SQL scripts against an active SQL Server instance to verify relational integrity, foreign key dependency order, and execution logic.
-- Output Validation: Mandates that every designed analytical query return a valid, non-empty schema result when run against the generated mock dataset before the development cycle is declared complete.
+# Agent Improvement Process
+# Project: Campus Space Management System (CS486)
+
+## Overview
+During the development of our autonomous database design agent, we evaluated the model's outputs at each of the seven required phases. We utilized a lightweight LLM (Deepseek v4 flash) for rapid generation. While the agent correctly understood standard database paradigms and syntax, our evaluation revealed consistent issues with "prompt amnesia," where the model failed to retain strict business constraints across long context windows.
+
+To resolve this, we iteratively improved the agent's SKILL.md instructions by implementing explicit guardrails, positive constraints, and forced loop-back evaluations.
+
+## Evaluation and Refinement by Phase
+### Phase 1 & 2: Conceptual Design and ERD
+Evaluation: The agent successfully normalized the booking lifecycle but forced a flawed assumption: a mandatory 1:1 relationship between BookingRequest and BookingApproval. This would break the system for standard rooms that might not require manual approval. It also failed to explicitly map relationship lines for auditing (e.g., who performed a check-in).
+
+Improvement: We updated SKILL.md to explicitly demand the accommodation of conditional approval workflows. We also added positive constraints requiring the agent to draw distinct Mermaid relationship lines for audit trails and to detail structural logic for handling overlapping Pending requests.
+
+### Phase 3 & 4: Logical Schema and Validation
+Evaluation: The logical schema correctly applied surrogate keys and audit columns. However, the agent's Phase 4 Validation completely ignored a critical project directive to "loop back and fix" structural gaps. It blindly validated its own flawed 1:1 approval assumption and ignored the complexities of date-range overlap constraints for pending requests.
+
+Improvement: We introduced CRITICAL CHECK flags into the Step 4 prompt. We mandated that the agent explicitly verify its support for optional approvals and pending overlaps, forcing a failure and a loop-back to Step 1 if the mandatory 1:1 approval flaw was detected.
+
+### Phase 5: Database Implementation (DDL)
+Evaluation: The SQL syntax was highly accurate, but the agent took lazy shortcuts in its triggers. For instance, to populate the StatusHistory tables, it hardcoded the ChangedBy user as the original requester, destroying the system's auditability. It also failed to write the AFTER UPDATE triggers required to populate its own ModifiedAt columns.
+
+Improvement: We refined the Step 5 instructions to strictly forbid using triggers for history insertion unless application context (like SESSION_CONTEXT()) was utilized. We also explicitly mandated the inclusion of AFTER UPDATE triggers for modified timestamps and enforced non-destructive database versioning (_v2).
+
+### Phase 6 & 7: Sample Data and Queries
+Evaluation: The agent generated syntactically correct data but violated chronological integrity by inserting physical check-ins for future dates. Crucially, it inserted records directly into their final state (e.g., Completed), bypassing the state machine and leaving the history tables empty. Consequently, time-relative queries in Phase 7 returned empty result sets, and the agent hardcoded magic numbers (BookingID = 1) instead of parameterizing its SQL.
+
+Improvement: We injected strict chronological constraints into the Step 6 prompt, requiring sequential UPDATE statements to simulate real-world lifecycles and populate history triggers. For Step 7, we forbade magic numbers, required DECLARE parameters to simulate application inputs, and strictly mandated that any query returning zero rows must trigger a rollback to Step 6 to fix the sample data.

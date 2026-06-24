@@ -68,11 +68,14 @@ The document must include:
 - Business purpose of the system
 - Stakeholders and user roles
 - Main business processes and operational goals
-- Entities and candidate attributes
-- Core relationships and cardinalities
-- Business rules and constraints, including booking conflicts and unavailable space rules
+- Entities and candidate attributes (Ensure audit and history tracking entities are explicitly defined)
+- Core relationships and cardinalities (Must explicitly map operational actions, such as Facility Staff relationships to Check-in/Check-out sessions)
+- Business rules and constraints, including:
+  - Explicit logic for handling overlapping bookings at the 'Pending' vs. 'Approved' stages.
+  - Conditional approval workflows (e.g., identifying if certain roles/spaces skip manual approval).
+  - Specific triggers for historical logging (e.g., state changes).
 - Assumptions (tagged minor vs structural, per "Handling ambiguity")
-- Open questions or ambiguities, that couldn't be resolved from the requirement sources, tagged as needing user input before proceeding with design
+- Open questions or ambiguities that couldn't be resolved from the requirement sources, tagged as needing user input before proceeding with design
 - Requirement traceability notes
 
 # Step 2: Conceptual Design / ERD
@@ -83,12 +86,15 @@ Save to `outputs/02-erd-design-G4.md`.
 
 The document must include:
 
-- A Mermaid `erDiagram` (validate the Mermaid syntax mentally or by rendering it — don't ship unparseable diagram code)
-- Main entities with identifiers and key attributes
-- Relationship names, cardinalities, and participation constraints
-- Notes for optionality, historical tracking, and status-driven behavior — state explicitly whether history is modeled via a history table or temporal table, per project conventions
-- Assumptions that affect conceptual design
-- Confirmation that conflicting bookings, maintenance blocks, and status transitions are structurally represented in the schema rather than left as application logic
+- A Mermaid `erDiagram` (validate the Mermaid syntax mentally or by rendering it — don't ship unparseable diagram code).
+  - **Ensure all audit and historical tracking relationships are explicitly drawn with distinct lines and descriptive verbs** (e.g., map separate "checks in" and "checks out" relationships from the User to the Session).
+- Main entities with identifiers and key attributes.
+- Relationship names, cardinalities, and participation constraints.
+  - **Account for conditional approval workflows in your cardinalities** (e.g., if certain roles or space types allow for auto-approval, reflect this optionality in the relationship between BookingRequest and BookingApproval).
+- Notes for optionality, historical tracking, and status-driven behavior — state explicitly whether history is modeled via a history table or temporal table, per project conventions.
+- Assumptions that affect conceptual design.
+- Confirmation that conflicting bookings, maintenance blocks, and status transitions are structurally represented in the schema rather than left as application logic.
+  - **Explicitly detail the structural logic for handling multiple overlapping 'Pending' requests** prior to any request reaching the 'Approved' state.
 
 # Step 3: Logical Database Design
 
@@ -115,13 +121,22 @@ Save to `outputs/04-design-validation-G4.md`.
 
 The document must include:
 
-- A **requirement-to-schema traceability matrix** (Requirement ID → Entity → Relationship → Table → Constraint) as an actual table, not just prose
-- Validation of business rules and constraints
-- Identification of any unresolved gaps or assumptions
-- Discussion of conflicting bookings, maintenance blocks, and status transitions. Make sure these are structurally represented in the schema (e.g. via a status history table) rather than just described in prose.
-- Any limitations that require application logic or advanced SQL Server features
+# Step 4: Database Design Validation
 
-**If this step finds a gap, contradiction or limitation, go back and fix Steps 1–3 before proceeding to Step 5.** Do not carry a known schema problem forward into the DDL.
+Validate the logical schema against the requirements.
+
+Save to `outputs/04-design-validation-G4.md`.
+
+The document must include:
+- A **requirement-to-schema traceability matrix** (Requirement ID → Entity → Relationship → Table → Constraint) as an actual table, not just prose.
+- Validation of business rules and constraints. 
+  - **CRITICAL CHECK:** Explicitly verify if your schema supports *conditional* approvals (where some bookings do not require manual approval). If your schema enforces a mandatory 1:1 relationship for approvals, **you have failed the validation**. Go back and fix Steps 1–3 to support 0-or-1 (optional) approvals.
+  - **CRITICAL CHECK:** Explicitly validate how the schema handles multiple overlapping requests that are in the 'Pending' state.
+- Identification of any unresolved gaps or assumptions in a dedicated section.
+- Discussion of conflicting bookings, maintenance blocks, and status transitions. Make sure these are structurally represented in the schema (e.g. via a status history table) rather than just described in prose.
+- Any limitations that require application logic or advanced SQL Server features.
+
+**If this step finds a gap, contradiction or limitation (especially regarding the critical checks above), go back and fix Steps 1–3 before proceeding to Step 5.** Do not carry a known schema problem forward into the DDL.
 
 # Step 5: Database Definition
 
@@ -140,6 +155,9 @@ The script must include:
 - Any needed lookup tables or seed-independent reference structures
 - Audit columns and delete-policy columns per project conventions
 - Comments only when needed for clarity
+- **CRITICAL**: Do NOT use triggers to populate StatusHistory tables if you cannot accurately determine the acting user. Hardcoding RequestedBy or ReportedBy as the ChangedBy user during an update is an auditing failure. Leave history insertion to the application layer, or use SESSION_CONTEXT().
+- **CRITICAL**: If you include ModifiedAt columns, you MUST include the corresponding AFTER UPDATE triggers to automatically update this timestamp.
+- **CRITICAL**: Follow the Database naming rule exactly: Do not write a script that aggressively drops the database. Use dynamic SQL or IF NOT EXISTS logic to append _v2, _v3 to the database name if the original is taken."
 
 # Step 6: Sample Data Preparation
 
@@ -149,13 +167,12 @@ Save to `outputs/06-sample-data-G4.sql`.
 
 The script must include:
 
-- Inserts ordered to satisfy foreign-key dependencies (parents before children)
-- Inserts for normal cases
-- Inserts for important edge cases
-- Data that supports bookings, approvals, maintenance, check-in, completion, and no-show scenarios
-- Sample data that helps verify constraint behavior and history reporting
-- Sample data that allows the queries in Step 7 to return meaningful results
-- Sample data should be in Vietnamese where appropriate to reflect the local context, but can be in English if the requirement sources are in English or if it helps clarify the data's purpose
+The script must include:
+- Inserts ordered to satisfy foreign-key dependencies (parents before children).
+- **CRITICAL: Chronological Integrity.** Assume today's date is [Insert Current Date]. Past bookings must be logically resolved (Completed, Cancelled, or NoShow). Future bookings must be logically pending or approved. Do not record actual check-ins or completion times for future dates.
+- **CRITICAL: Lifecycle Simulation.** Do NOT insert records directly into their final state (e.g., 'Completed'). You MUST insert them as 'Pending' and use sequential `UPDATE` statements to transition their statuses so the database triggers can populate the History tables correctly. 
+- **CRITICAL: Negative Test Cases.** Include a dedicated section at the bottom of the script with commented-out `INSERT` statements that intentionally violate your business rules (e.g., an overlapping booking, booking a space under maintenance). Add a comment explaining why each will fail.
+- Localized context: Use Vietnamese names, and feel free to use realistic building/campus names relevant to a Vietnamese University of Science context.
 
 # Step 7: Query Design
 
@@ -164,14 +181,15 @@ Create at least ten meaningful SQL queries for the database.
 Save to `outputs/07-query-design-G4.sql`.
 
 Each query section must include:
-
 - Business question
 - Target user(s)
 - Short explanation of usefulness
 - SQL statement
 
-The queries should support questions such as booking history, upcoming bookings, spaces under maintenance, utilization, no-show bookings, conflicting bookings and status transitions.
-If the query returns no result, go back to Step 6 and add sample data to ensure it does, unless the requirement explicitly allows for empty results in that case.
+Constraints:
+- **CRITICAL: Parameterization.** Do NOT hardcode IDs or magic numbers in the `WHERE` clauses (e.g., `WHERE BookingID = 1`). Simulate application parameters by using `DECLARE @VariableName Type = Value;` before the query.
+- **CRITICAL: Empty Result Prevention.** You MUST mentally trace your queries against the sample data from Step 6 using the REAL WORLD CURRENT DATE. If time-relative functions like `SYSUTCDATETIME()` result in 0 rows because your Step 6 dates don't align with today, you MUST go back and fix the sample data in Step 6. Do not deliver queries that return empty sets.
+- Do not introduce unstated mathematical assumptions (e.g., assuming an 8-hour workday for utilization percentages) without documenting them clearly in the query comments.
 
 # Step 8: Execution Verification
 
