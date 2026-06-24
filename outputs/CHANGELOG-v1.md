@@ -1,8 +1,8 @@
-# CHANGELOG — v2 (DeepSeek Migration)
+# CHANGELOG — v1 (DeepSeek Migration)
 
-## 1. Model Migration: Big Pickle → DeepSeek V4
+## 1. Model Migration: v0 (Big Pickle) → v1 (DeepSeek V4)
 
-| Aspect | v1 (Big Pickle) | v2 (DeepSeek V4) |
+| Aspect | v0 (Big Pickle) | v1 (DeepSeek V4) |
 |---|---|---|
 | Generator | Big Pickle (pre-DeepSeek) | DeepSeek V4 |
 | Output style | Verbose sections with tables, lengthy explanations | Concise structured markdown and raw SQL, zero conversational filler |
@@ -13,7 +13,7 @@
 
 ### Entity / Table Changes
 
-| File | v1 → v2 Change |
+| File | v0 → v1 Change |
 |---|---|
 | `03-logical-design-G04.md` | FK columns now explicitly list referenced parent columns (e.g., `FK → User(userId)` instead of `FK → User`) |
 | `03-logical-design-G04.md` | `DEFAULT GETUTCDATE()` → `DEFAULT SYSUTCDATETIME()` (MS SQL Server canonical form) |
@@ -25,7 +25,7 @@
 
 ### Structural Constraints
 
-| Constraint | v1 | v2 |
+| Constraint | v0 | v1 |
 |---|---|---|
 | `Booking.submittedAt` | `DEFAULT GETUTCDATE()` | `DEFAULT SYSUTCDATETIME()` |
 | `CK_User_accountStatus` | Multi-line value list | Single-line value list |
@@ -37,7 +37,7 @@
 
 ### Query Optimization in `07-query-design-G04.sql`
 
-| Aspect | v1 | v2 |
+| Aspect | v0 | v1 |
 |---|---|---|
 | Query header format | Business question + Explanation only | **Business question** + **Target user** + **Explanation** |
 | Parameterization | Standalone section at end | `DECLARE @Param` at top of **every** query |
@@ -49,7 +49,7 @@
 
 ### Data Integrity in `06-sample-data-G04.sql`
 
-| Aspect | v1 | v2 |
+| Aspect | v0 | v1 |
 |---|---|---|
 | INSERT grouping | Individual INSERT per record (many `VALUES` blocks) | Batched `INSERT ... VALUES (...), (...)` for each table |
 | Sample count | 10 users, 9 spaces, 24 SF rows, 13 bookings, 6 approvals, 3 check-ins, 2 check-outs, 5 maintenance | Same data volume, fewer redundant comment separators |
@@ -59,7 +59,7 @@
 
 ### DDL Cleanliness in `05-db-definition-G04.sql`
 
-| Aspect | v1 | v2 |
+| Aspect | v0 | v1 |
 |---|---|---|
 | Table header comments | `-- ===== N. Name =====` (heavy banner) | `-- N. Name (dependencies)` (inline) |
 | Blank lines after column lists | Present before `CONSTRAINT` block | Removed |
@@ -67,7 +67,7 @@
 
 ## 4. Formatting Fixes (File Naming & Extensions)
 
-| v1 Filename | v2 Filename | Reason |
+| v0 Filename | v1 Filename | Reason |
 |---|---|---|
 | `01-business-requirement-analysis.md` | `01-business-req-analysis-G04.md` | Group suffix `-G04`; shorted name |
 | `02-conceptual-design-erd.md` | `02-erd-design-G04.md` | Group suffix `-G04`; shorted name |
@@ -79,7 +79,7 @@
 
 ## 5. SKILL.md Pipeline Updates
 
-| Section | v1 | v2 |
+| Section | v0 | v1 |
 |---|---|---|
 | Behavior | No model-specific instructions | **DeepSeek Optimization** subsection added |
 | Step 5 spec | DDL Schema (`.md`) | DDL Schema, Pure SQL (`.sql`) |
