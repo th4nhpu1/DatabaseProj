@@ -1,8 +1,8 @@
 -- ============================================================
 -- 07-query-design-G04.sql
--- Business Queries for School Space Booking System
+-- Business Queries — School Space Booking System
 -- Group 04
--- Microsoft SQL Server
+-- Microsoft SQL Server T-SQL
 -- ============================================================
 
 -- ============================================================
@@ -13,13 +13,12 @@
 --   09:00 to 11:00?
 --
 -- Target user:
---   Students, lecturers, and staff looking for a free room.
+--   Students, lecturers, or staff looking for a free room.
 --
 -- Explanation:
---   Filters spaces whose current status is 'available',
---   then excludes any that have an overlapping approved/
---   active booking OR an overlapping ongoing maintenance
---   record.
+--   Filters spaces with currentStatus = 'available', then
+--   excludes those with overlapping approved/active bookings
+--   or overlapping ongoing maintenance records.
 -- ============================================================
 DECLARE @Q1_Start DATETIME2 = '2026-09-01 09:00:00';
 DECLARE @Q1_End   DATETIME2 = '2026-09-01 11:00:00';
@@ -29,16 +28,14 @@ SELECT s.spaceCode, s.spaceName, s.spaceType, s.building,
 FROM [Space] s
 WHERE s.currentStatus = 'available'
   AND NOT EXISTS (
-      SELECT 1
-      FROM [Booking] b
+      SELECT 1 FROM [Booking] b
       WHERE b.spaceCode = s.spaceCode
         AND b.status IN ('approved', 'checked_in', 'completed')
         AND b.requestedStartTime < @Q1_End
         AND b.requestedEndTime   > @Q1_Start
   )
   AND NOT EXISTS (
-      SELECT 1
-      FROM [MaintenanceRecord] m
+      SELECT 1 FROM [MaintenanceRecord] m
       WHERE m.spaceCode = s.spaceCode
         AND m.status IN ('reported', 'in_progress')
         AND m.startTime < @Q1_End
@@ -46,20 +43,19 @@ WHERE s.currentStatus = 'available'
   )
 ORDER BY s.building, s.floor, s.roomNumber;
 
-
 -- ============================================================
 -- Query 2: Find conflicting bookings for a specific space
 --
 -- Business question:
---   Are there any existing bookings that conflict with a new
+--   Are there existing bookings conflicting with a new
 --   request for space CS-A101 on 2026-09-10?
 --
 -- Target user:
---   Facility staff checking for scheduling conflicts.
+--   Facility staff checking scheduling conflicts.
 --
 -- Explanation:
---   Retrieves all approved/active bookings for a given space
---   on a specific date, ordered by start time.
+--   Retrieves all active (approved/checked_in/completed)
+--   bookings for a given space on a target date.
 -- ============================================================
 DECLARE @Q2_SpaceCode NVARCHAR(20) = 'CS-A101';
 DECLARE @Q2_TargetDate DATE = '2026-09-10';
@@ -74,21 +70,19 @@ WHERE b.spaceCode = @Q2_SpaceCode
   AND CAST(b.requestedStartTime AS DATE) = @Q2_TargetDate
 ORDER BY b.requestedStartTime;
 
-
 -- ============================================================
 -- Query 3: View booking history of a specific user
 --
 -- Business question:
---   Show all past and present bookings for the user with
---   userId = 4 (lecturer Pham Minh Duc).
+--   Show all past and present bookings for userId = 4
+--   (lecturer Pham Minh Duc).
 --
 -- Target user:
 --   Lecturers and students reviewing their own bookings.
 --
 -- Explanation:
---   Joins Booking with Space and the optional approval,
---   check-in, and check-out tables to present a complete
---   timeline.
+--   Joins Booking with Space, BookingApproval, CheckIn,
+--   and CheckOut to present a complete booking timeline.
 -- ============================================================
 DECLARE @Q3_UserId INT = 4;
 
@@ -105,13 +99,12 @@ LEFT JOIN [CheckOut] co ON b.bookingId = co.bookingId
 WHERE b.userId = @Q3_UserId
 ORDER BY b.requestedStartTime DESC;
 
-
 -- ============================================================
 -- Query 4: View upcoming approved bookings for a space
 --
 -- Business question:
---   What approved bookings are coming up for the Computer
---   Lab CS-B202?
+--   What approved bookings are coming up for Computer Lab
+--   CS-B202?
 --
 -- Target user:
 --   Facility staff preparing rooms for upcoming sessions.
@@ -132,7 +125,6 @@ WHERE b.spaceCode = @Q4_SpaceCode
   AND b.requestedStartTime > SYSUTCDATETIME()
 ORDER BY b.requestedStartTime;
 
-
 -- ============================================================
 -- Query 5: Find spaces currently under maintenance
 --
@@ -141,16 +133,14 @@ ORDER BY b.requestedStartTime;
 --   are the problems?
 --
 -- Target user:
---   Facility manager and staff monitoring maintenance status.
+--   Facility manager and staff monitoring maintenance.
 --
 -- Explanation:
---   Joins Space with MaintenanceRecord for all records
---   that are reported or in progress, showing problem
---   details and assigned personnel.
+--   Joins Space with MaintenanceRecord for all reported or
+--   in-progress records, showing problem and personnel.
 -- ============================================================
 SELECT s.spaceCode, s.spaceName, s.building, s.floor, s.roomNumber,
-       m.recordId, m.problemDescription,
-       m.startTime,
+       m.recordId, m.problemDescription, m.startTime,
        reporter.fullName AS reportedByName,
        assignee.fullName AS assignedToName,
        m.status
@@ -162,9 +152,8 @@ WHERE m.status IN ('reported', 'in_progress')
   AND (m.completionTime IS NULL OR m.completionTime > SYSUTCDATETIME())
 ORDER BY m.startTime DESC;
 
-
 -- ============================================================
--- Query 6: Generate a utilization report for September 2026
+-- Query 6: Generate a utilization report (Sep 2026)
 --
 -- Business question:
 --   What percentage of time was each space used during
@@ -174,10 +163,9 @@ ORDER BY m.startTime DESC;
 --   Facility manager reviewing space utilization.
 --
 -- Explanation:
---   For each space, calculates the sum of hours from
---   approved/active bookings within the month, divides by
---   total available hours in the month, and returns a
---   percentage.
+--   Sums hours from approved/active bookings within the
+--   month, divides by total available hours (720 for 30
+--   days), and returns a utilization percentage.
 -- ============================================================
 DECLARE @Q6_MonthStart DATETIME2 = '2026-09-01 00:00:00';
 DECLARE @Q6_MonthEnd   DATETIME2 = '2026-10-01 00:00:00';
@@ -192,16 +180,14 @@ SELECT s.spaceCode, s.spaceName, s.spaceType, s.capacity,
            )
        ) / 60.0, 0) AS usedHours,
        720 AS availableHours,
-       ROUND(
-           COALESCE(SUM(
-               DATEDIFF(MINUTE,
-                   CASE WHEN b.requestedStartTime < @Q6_MonthStart
-                        THEN @Q6_MonthStart ELSE b.requestedStartTime END,
-                   CASE WHEN b.requestedEndTime > @Q6_MonthEnd
-                        THEN @Q6_MonthEnd ELSE b.requestedEndTime END
-               )
-           ) / 60.0, 0) / 720.0 * 100, 2
-       ) AS utilizationPercent
+       ROUND(COALESCE(SUM(
+           DATEDIFF(MINUTE,
+               CASE WHEN b.requestedStartTime < @Q6_MonthStart
+                    THEN @Q6_MonthStart ELSE b.requestedStartTime END,
+               CASE WHEN b.requestedEndTime > @Q6_MonthEnd
+                    THEN @Q6_MonthEnd ELSE b.requestedEndTime END
+           )
+       ) / 60.0, 0) / 720.0 * 100, 2) AS utilizationPercent
 FROM [Space] s
 LEFT JOIN [Booking] b ON s.spaceCode = b.spaceCode
     AND b.status IN ('approved', 'checked_in', 'completed')
@@ -209,7 +195,6 @@ LEFT JOIN [Booking] b ON s.spaceCode = b.spaceCode
     AND b.requestedEndTime   > @Q6_MonthStart
 GROUP BY s.spaceCode, s.spaceName, s.spaceType, s.capacity
 ORDER BY utilizationPercent DESC;
-
 
 -- ============================================================
 -- Query 7: List bookings checked in but not completed
@@ -222,8 +207,8 @@ ORDER BY utilizationPercent DESC;
 --   Facility staff following up on incomplete sessions.
 --
 -- Explanation:
---   Finds all bookings in 'checked_in' status that have
---   a CheckIn record but no corresponding CheckOut record.
+--   Finds bookings with status 'checked_in' that have a
+--   CheckIn record but no corresponding CheckOut record.
 -- ============================================================
 SELECT b.bookingId, u.fullName AS requester,
        s.spaceName, s.spaceCode,
@@ -239,21 +224,18 @@ WHERE b.status = 'checked_in'
   AND co.bookingId IS NULL
 ORDER BY ci.actualStartTime;
 
-
 -- ============================================================
 -- Query 8: Find the most frequently booked space type
 --
 -- Business question:
---   Which type of space (auditorium, classroom, lab, etc.)
---   is booked the most this year?
+--   Which type of space is booked the most in 2026?
 --
 -- Target user:
 --   Facility manager planning resource allocation.
 --
 -- Explanation:
---   Groups bookings (approved/checked-in/completed) by
---   space type, counts the total, sums the hours, and
---   orders by total count descending.
+--   Groups bookings by space type, counts total and sums
+--   hours, ordered by total count descending.
 -- ============================================================
 DECLARE @Q8_YearStart DATE = '2026-01-01';
 DECLARE @Q8_YearEnd   DATE = '2027-01-01';
@@ -262,10 +244,8 @@ SELECT s.spaceType,
        COUNT(b.bookingId) AS totalBookings,
        SUM(DATEDIFF(MINUTE, b.requestedStartTime, b.requestedEndTime)) / 60.0 AS totalHours,
        COUNT(DISTINCT s.spaceCode) AS numberOfSpaces,
-       ROUND(
-           SUM(DATEDIFF(MINUTE, b.requestedStartTime, b.requestedEndTime)) / 60.0 /
-           NULLIF(COUNT(DISTINCT s.spaceCode), 0), 2
-       ) AS avgHoursPerSpace
+       ROUND(SUM(DATEDIFF(MINUTE, b.requestedStartTime, b.requestedEndTime)) / 60.0 /
+             NULLIF(COUNT(DISTINCT s.spaceCode), 0), 2) AS avgHoursPerSpace
 FROM [Booking] b
 JOIN [Space] s ON b.spaceCode = s.spaceCode
 WHERE b.status IN ('approved', 'checked_in', 'completed')
@@ -273,7 +253,6 @@ WHERE b.status IN ('approved', 'checked_in', 'completed')
   AND b.requestedStartTime <  @Q8_YearEnd
 GROUP BY s.spaceType
 ORDER BY totalBookings DESC;
-
 
 -- ============================================================
 -- Query 9: Get maintenance history for a specific space
@@ -283,11 +262,11 @@ ORDER BY totalBookings DESC;
 --   Computer Lab CS-B202?
 --
 -- Target user:
---   Facility staff reviewing past issues with a space.
+--   Facility staff reviewing past issues.
 --
 -- Explanation:
---   Lists all maintenance records for a given space with
---   reporter and assignee details, ordered newest first.
+--   Lists all maintenance records for a space with reporter
+--   and assignee details, newest first.
 -- ============================================================
 DECLARE @Q9_SpaceCode NVARCHAR(20) = 'CS-B202';
 
@@ -301,22 +280,19 @@ LEFT JOIN [User] assignee ON m.assignedTo = assignee.userId
 WHERE m.spaceCode = @Q9_SpaceCode
 ORDER BY m.startTime DESC;
 
-
 -- ============================================================
 -- Query 10: List pending bookings that need approval
 --
 -- Business question:
---   Show all pending bookings that have not yet been
---   approved or rejected, with the time elapsed since
---   submission.
+--   Show all pending bookings not yet approved or rejected,
+--   with elapsed time since submission.
 --
 -- Target user:
 --   Facility staff processing booking requests.
 --
 -- Explanation:
 --   Left joins BookingApproval and filters for status =
---   'pending' with no approval record yet, ordering by
---   submission time (oldest first).
+--   'pending' with no approval record, ordered oldest first.
 -- ============================================================
 SELECT b.bookingId, u.fullName AS requester, u.email, u.phone,
        s.spaceName, s.spaceCode, s.building, s.floor, s.roomNumber,

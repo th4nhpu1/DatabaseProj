@@ -1,7 +1,8 @@
 # Logical Design — Group 04
 
-## Table: User
+## Table Mappings
 
+### User
 | Column | Type | Length | Nullable | Constraint |
 |---|---|---|---|---|
 | userId | INT | — | NOT NULL | PK, IDENTITY(1,1) |
@@ -12,87 +13,79 @@
 | department | NVARCHAR | 100 | YES | — |
 | accountStatus | NVARCHAR | 20 | NOT NULL | DEFAULT 'active' |
 
-## Table: Space
-
+### Space
 | Column | Type | Length | Nullable | Constraint |
 |---|---|---|---|---|
 | spaceCode | NVARCHAR | 20 | NOT NULL | PK |
 | spaceName | NVARCHAR | 200 | NOT NULL | — |
-| spaceType | NVARCHAR | 50 | NOT NULL | CHECK (spaceType IN (...)) |
+| spaceType | NVARCHAR | 50 | NOT NULL | CHECK (IN ...) |
 | building | NVARCHAR | 100 | NOT NULL | — |
 | floor | INT | — | NOT NULL | — |
 | roomNumber | NVARCHAR | 20 | NOT NULL | — |
-| capacity | INT | — | NOT NULL | CHECK (capacity > 0) |
+| capacity | INT | — | NOT NULL | CHECK (> 0) |
 | currentStatus | NVARCHAR | 30 | NOT NULL | DEFAULT 'available' |
 | usagePolicy | NVARCHAR | MAX | YES | — |
 
-## Table: Facility
-
+### Facility
 | Column | Type | Length | Nullable | Constraint |
 |---|---|---|---|---|
 | facilityId | INT | — | NOT NULL | PK, IDENTITY(1,1) |
 | facilityName | NVARCHAR | 100 | NOT NULL | UNIQUE |
 | description | NVARCHAR | 500 | YES | — |
 
-## Table: SpaceFacility
-
+### SpaceFacility
 | Column | Type | Length | Nullable | Constraint |
 |---|---|---|---|---|
 | spaceCode | NVARCHAR | 20 | NOT NULL | PK (composite), FK → Space |
 | facilityId | INT | — | NOT NULL | PK (composite), FK → Facility |
 | quantity | INT | — | NOT NULL | DEFAULT 1, CHECK (> 0) |
 
-## Table: Booking
-
+### Booking
 | Column | Type | Length | Nullable | Constraint |
 |---|---|---|---|---|
 | bookingId | INT | — | NOT NULL | PK, IDENTITY(1,1) |
-| userId | INT | — | NOT NULL | FK → User |
-| spaceCode | NVARCHAR | 20 | NOT NULL | FK → Space |
+| userId | INT | — | NOT NULL | FK → User(userId) |
+| spaceCode | NVARCHAR | 20 | NOT NULL | FK → Space(spaceCode) |
 | requestedStartTime | DATETIME2(2) | — | NOT NULL | — |
 | requestedEndTime | DATETIME2(2) | — | NOT NULL | CHECK (end > start) |
 | purpose | NVARCHAR | 500 | YES | — |
 | expectedParticipants | INT | — | NOT NULL | CHECK (> 0) |
 | bookingType | NVARCHAR | 30 | NOT NULL | CHECK (IN ...) |
 | status | NVARCHAR | 20 | NOT NULL | DEFAULT 'pending' |
-| submittedAt | DATETIME2(2) | — | NOT NULL | DEFAULT GETUTCDATE() |
+| submittedAt | DATETIME2(2) | — | NOT NULL | DEFAULT SYSUTCDATETIME() |
 
-## Table: BookingApproval
-
+### BookingApproval
 | Column | Type | Length | Nullable | Constraint |
 |---|---|---|---|---|
-| bookingId | INT | — | NOT NULL | PK, FK → Booking (CASCADE) |
-| decisionBy | INT | — | NOT NULL | FK → User |
+| bookingId | INT | — | NOT NULL | PK, FK → Booking |
+| decisionBy | INT | — | NOT NULL | FK → User(userId) |
 | decisionTime | DATETIME2(2) | — | NOT NULL | — |
 | decisionNote | NVARCHAR | 500 | YES | — |
 | rejectionReason | NVARCHAR | 500 | YES | — |
 
-## Table: CheckIn
-
+### CheckIn
 | Column | Type | Length | Nullable | Constraint |
 |---|---|---|---|---|
-| bookingId | INT | — | NOT NULL | PK, FK → Booking (CASCADE) |
-| checkedInBy | INT | — | NOT NULL | FK → User |
+| bookingId | INT | — | NOT NULL | PK, FK → Booking |
+| checkedInBy | INT | — | NOT NULL | FK → User(userId) |
 | actualStartTime | DATETIME2(2) | — | NOT NULL | — |
 | initialCondition | NVARCHAR | 500 | YES | — |
 
-## Table: CheckOut
-
+### CheckOut
 | Column | Type | Length | Nullable | Constraint |
 |---|---|---|---|---|
-| bookingId | INT | — | NOT NULL | PK, FK → Booking (CASCADE) |
+| bookingId | INT | — | NOT NULL | PK, FK → Booking |
 | actualEndTime | DATETIME2(2) | — | NOT NULL | — |
 | finalCondition | NVARCHAR | 500 | YES | — |
 | usageNotes | NVARCHAR | MAX | YES | — |
 
-## Table: MaintenanceRecord
-
+### MaintenanceRecord
 | Column | Type | Length | Nullable | Constraint |
 |---|---|---|---|---|
 | recordId | INT | — | NOT NULL | PK, IDENTITY(1,1) |
 | spaceCode | NVARCHAR | 20 | NOT NULL | FK → Space |
 | reportedBy | INT | — | NOT NULL | FK → User |
-| assignedTo | INT | — | YES | FK → User (SET NULL) |
+| assignedTo | INT | — | YES | FK → User, SET NULL |
 | problemDescription | NVARCHAR | 1000 | NOT NULL | — |
 | startTime | DATETIME2(2) | — | NOT NULL | — |
 | completionTime | DATETIME2(2) | — | YES | — |
@@ -106,16 +99,16 @@
 | User | System users | 500 | Low |
 | Space | Bookable spaces | 50 | Very low |
 | Facility | Equipment types | 20 | Very low |
-| SpaceFacility | Space-facility assignment | 200 | Low |
-| Booking | Booking requests | 10,000/year | Medium |
-| BookingApproval | Approvals/rejections | 8,000/year | Medium |
-| CheckIn | Check-in records | 6,000/year | Medium |
-| CheckOut | Check-out records | 5,500/year | Medium |
-| MaintenanceRecord | Maintenance issues | 200/year | Low |
+| SpaceFacility | Space-facility assignments | 200 | Low |
+| Booking | Booking requests | 10,000/yr | Medium |
+| BookingApproval | Approval/rejection records | 8,000/yr | Medium |
+| CheckIn | Check-in records | 6,000/yr | Medium |
+| CheckOut | Check-out records | 5,500/yr | Medium |
+| MaintenanceRecord | Maintenance issues | 200/yr | Low |
 
 ## Referential Integrity
 
-| FK Table | FK Column(s) | Parent Table | On Update | On Delete |
+| FK Table | FK Column(s) | Parent | ON UPDATE | ON DELETE |
 |---|---|---|---|---|
 | Booking | userId | User | NO ACTION | NO ACTION |
 | Booking | spaceCode | Space | NO ACTION | NO ACTION |
@@ -129,11 +122,3 @@
 | MaintenanceRecord | spaceCode | Space | CASCADE | NO ACTION |
 | MaintenanceRecord | reportedBy | User | NO ACTION | NO ACTION |
 | MaintenanceRecord | assignedTo | User | NO ACTION | SET NULL |
-
-## Assumptions
-
-1. BookingApproval, CheckIn, and CheckOut use bookingId as PK (1:0..1 relationships).
-2. Cross-table validation (e.g., CheckOut time > CheckIn time) is enforced at the application layer.
-3. rejectionReason is application-enforced to be non-null when status = 'rejected'.
-4. All IDENTITY seeds start at 1 and increment by 1.
-5. DATETIME2(2) balances precision (~10 ms) with storage efficiency.

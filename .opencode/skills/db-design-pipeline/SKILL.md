@@ -17,17 +17,22 @@ Before assuming anything, inspect the project:
 3. Read the relevant requirement files fully before designing.
 4. If the requirement is incomplete, continue with explicit assumptions, but also create an unresolved questions section.
 
+### DeepSeek Optimization
+
+- Avoid any conversational filler, meta-commentary, or introductory chat (e.g., 'Sure, here is the design...'). Output ONLY the requested clean Markdown structure or raw executable SQL code blocks.
+- Enforce strict, standard, syntax-valid SQL syntax with explicit data types and relational constraints tailored for high performance.
+
 ## Required output files
 
 Create or update the following 7 files under `outputs/`:
 
-1. `outputs/01-business-requirement-analysis.md`
-2. `outputs/02-conceptual-design-erd.md`
-3. `outputs/03-logical-design.md`
-4. `outputs/04-normalization.md`
-5. `outputs/05-ddl-schema.md`
-6. `outputs/06-constraints-indexes.md`
-7. `outputs/07-query-design.md`
+1. `outputs/01-business-req-analysis-G04.md`
+2. `outputs/02-erd-design-G04.md`
+3. `outputs/03-logical-design-G04.md`
+4. `outputs/04-design-validation-G04.md`
+5. `outputs/05-db-definition-G04.sql`
+6. `outputs/06-sample-data-G04.sql`
+7. `outputs/07-query-design-G04.sql`
 
 Do not skip any file. Do not use placeholders.
 
@@ -37,7 +42,7 @@ Do not skip any file. Do not use placeholders.
 
 Save to:
 
-`outputs/01-business-requirement-analysis.md`
+`outputs/01-business-req-analysis-G04.md`
 
 The document must include:
 
@@ -58,7 +63,7 @@ The ERD should be based on the document from Step 1.
 
 Save to:
 
-`outputs/02-conceptual-design-erd.md`
+`outputs/02-erd-design-G04.md`
 
 The document must include:
 
@@ -76,7 +81,7 @@ Based on the Conceptual ERD from Step 2.
 
 Save to:
 
-`outputs/03-logical-design.md`
+`outputs/03-logical-design-G04.md`
 
 The document must include:
 
@@ -94,7 +99,7 @@ Based on the Logical Design from Step 3.
 
 Save to:
 
-`outputs/04-normalization.md`
+`outputs/04-design-validation-G04.md`
 
 The document must include:
 
@@ -107,13 +112,13 @@ The document must include:
 
 ---
 
-# Step 5: DDL Schema
+# Step 5: DDL Schema (Pure SQL)
 
 Based on the normalized Logical Design from Step 4.
 
 Save to:
 
-`outputs/05-ddl-schema.md`
+`outputs/05-db-definition-G04.sql`
 
 The document must include:
 
@@ -131,34 +136,31 @@ The document must include:
 
 ---
 
-# Step 6: Constraints and Indexes
+# Step 6: Sample Data (Pure SQL INSERT)
 
 Based on the DDL Schema from Step 5.
 
 Save to:
 
-`outputs/06-constraints-indexes.md`
+`outputs/06-sample-data-G04.sql`
 
 The document must include:
 
-- List of all primary key constraints (table, column(s), constraint name)
-- List of all foreign key constraints (table, column(s), references, ON UPDATE, ON DELETE)
-- List of all unique constraints (table, column(s), purpose)
-- List of all check constraints (table, column(s), condition, purpose)
-- List of recommended indexes (non-clustered) for performance, with columns and justification (based on query patterns: lookups by foreign key, filtering by status/dates, etc.)
-- List of default values
-- Complete T-SQL script that can be run after the DDL to add all non-schema-definable constraints (e.g., filtered indexes)
-- Assumptions
+- Realistic INSERT statements for all tables, covering normal operational cases and exceptional/boundary-testing cases
+- Insert order must respect FK dependencies (parents before children)
+- At minimum: 10+ users with varied roles, 8+ spaces including some under maintenance/closed/retired, 6+ facility types, space-facility assignments, 10+ bookings spanning all statuses (pending, approved, rejected, cancelled, checked_in, completed, no_show), corresponding approvals, check-ins, check-outs, and 5+ maintenance records
+- Exceptional cases: overlapping booking attempt, booking for a space under maintenance, suspended user, retired space
+- Each INSERT prefixed with a brief inline comment describing the scenario
 
 ---
 
-# Step 7: Query Design
+# Step 7: Query Design (Pure SQL)
 
 Based on the full schema from Steps 5 and 6.
 
 Save to:
 
-`outputs/07-query-design.md`
+`outputs/07-query-design-G04.sql`
 
 The document must include:
 
@@ -173,9 +175,9 @@ The document must include:
   8. Find the most frequently booked space type
   9. Get maintenance history for a specific space
   10. List pending bookings that need approval
-- Each query must include:
+- Each query must have a header comment block containing:
   - Business question (in plain English)
-  - SQL query (T-SQL syntax)
-  - Explanation of what the query does
-- Include a section with parameterized versions of key queries (for use in application code)
-- Assumptions
+  - Target user (who would run this query)
+  - Explanation of the logic
+- Each query must use DECLARE parameters for filter values (parameterized)
+- All SQL must be syntax-valid T-SQL for Microsoft SQL Server
