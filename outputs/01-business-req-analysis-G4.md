@@ -25,16 +25,16 @@ The School of Computer Science needs a database system to manage the booking and
 
 ## Candidate Entities and Attributes
 
-| Entity | Candidate Attributes |
-|--------|---------------------|
-| User | user_id, full_name, email, phone, role, department, account_status |
-| Space | space_code, space_name, space_type, building, floor, room_number, capacity, status, usage_policy |
-| Facility | facility_id, facility_name |
-| SpaceFacility | space_code, facility_id |
-| Booking | booking_id, requester, space, requested_start, requested_end, purpose, expected_participants, booking_type, status, created_at |
-| BookingApproval | booking_id, staff_id, decision, decision_time, decision_note |
-| BookingSession | booking_id, actual_start, checked_in_by, initial_condition, actual_end, final_condition, usage_notes |
-| Maintenance | maintenance_id, space, reporter, assigned_staff, problem_description, start_time, completion_time, status, result_note |
+| Entity | Audit Required | Soft-Delete | Candidate Attributes |
+|--------|---------------|-------------|---------------------|
+| User | No (reference) | Yes | user_id, full_name, email, phone, role, department, account_status |
+| Space | No (reference) | Yes | space_code, space_name, space_type, building, floor, room_number, capacity, status, usage_policy |
+| Facility | No (reference) | No | facility_id, facility_name |
+| SpaceFacility | No (junction) | No | space_code, facility_id |
+| Booking | Yes (transactional) | No | booking_id, requester, space, requested_start, requested_end, purpose, expected_participants, booking_type, status |
+| BookingApproval | Yes (transactional) | No | approval_id, booking_id, staff_id, decision, decision_time, decision_note |
+| BookingSession | Yes (transactional) | No | session_id, booking_id, actual_start, checked_in_by, initial_condition, actual_end, final_condition, usage_notes |
+| Maintenance | Yes (transactional) | No | maintenance_id, space, reporter, assigned_staff, problem_description, start_time, completion_time, status, result_note |
 
 ## Core Relationships and Cardinalities
 
@@ -51,44 +51,51 @@ The School of Computer Science needs a database system to manage the booking and
 
 1. A space cannot have two approved bookings with overlapping time periods.
 2. A space that is under maintenance, closed, or retired cannot be booked.
-3. Booking statuses: pending, approved, rejected, cancelled, checked_in, completed, no-show.
-4. Space statuses: available, in_use, under_maintenance, temporarily_closed, retired.
-5. When a booking is approved/rejected, the decision must record the staff member, decision time, and note.
-6. Check-in records actual start time, who checked in, and initial condition.
-7. Completion records actual end time, final condition, and usage notes.
-8. Maintenance statuses: reported, assigned, in_progress, completed, cancelled.
-9. The system must preserve historical records (no hard delete of bookings or maintenance).
+3. Expected participants must not exceed the space's capacity.
+4. Booking statuses: pending, approved, rejected, cancelled, checked_in, completed, no-show.
+5. Space statuses: available, in_use, under_maintenance, temporarily_closed, retired.
+6. When a booking is approved/rejected, the decision must record the staff member, decision time, and note.
+7. Check-in records actual start time, who checked in, and initial condition.
+8. Completion records actual end time, final condition, and usage notes.
+9. Maintenance statuses: reported, assigned, in_progress, completed, cancelled.
+10. The system must preserve historical records (no hard delete of bookings or maintenance).
 
 ## Assumptions
 
-- User accounts and authentication are handled by an external university system; the database stores a reference copy of user data.
-- Booking time slots are continuous (no predefined time blocks).
-- A booking is considered "no-show" if not checked in within a reasonable window (enforced by application logic, not DB constraints).
-- Approval is required for all bookings except those made by facility staff/manager (enforced by application logic).
-- The same staff member can perform both approval and check-in for the same booking.
-- Maintenance completion time is nullable until the work is finished.
+| Assumption | Classification | Rationale |
+|------------|---------------|-----------|
+| User accounts and authentication are handled by an external university system; the database stores a reference copy of user data | Structural | Affects User table design — no password fields needed |
+| Booking time slots are continuous (no predefined time blocks) | Minor | Simplifies scheduling logic; no time-slot lookup table |
+| A booking is considered "no-show" if not checked in within a reasonable window (enforced by application logic, not DB constraints) | Minor | Threshold is configurable; DB only stores status |
+| Approval is required for all bookings except those made by facility staff/manager | Structural | Affects the approval workflow logic |
+| The same staff member can perform both approval and check-in for the same booking | Minor | No conflict-of-interest constraint in DB |
+| Maintenance completion time is nullable until the work is finished | Minor | start_time is NOT NULL; completion_time is NULL until done |
+| Capacity enforcement is a hard constraint checked at booking time | Structural | Requires trigger to compare expected_participants against Space.capacity |
 
 ## Open Questions / Ambiguities
 
 - What is the exact no-show threshold (minutes after requested start)?
 - Can a single booking span multiple days?
-- Are there any capacity-based restrictions (e.g., max participants must not exceed room capacity)?
 - Should the system support recurring bookings?
 - What is the cancellation policy and who can cancel?
+- Should there be a maximum booking duration per space type?
+- Are there special approval workflows for high-capacity or restricted spaces?
 
-## Requirement Traceability
+## Requirement Traceability Matrix
 
-| Req # | Description | Entity |
-|-------|-------------|--------|
-| R01 | User account management | User |
-| R02 | Bookable space catalog | Space, SpaceFacility |
-| R03 | Facility/equipment tracking | Facility, SpaceFacility |
-| R04 | Booking request submission | Booking |
-| R05 | Overlap prevention | Booking (constraint) |
-| R06 | Unavailable space prevention | Booking (constraint) |
-| R07 | Booking approval workflow | BookingApproval |
-| R08 | Check-in process | BookingSession |
-| R09 | Completion/check-out process | BookingSession |
-| R10 | Maintenance management | Maintenance |
-| R11 | Historical record keeping | All entities |
-| R12 | Reporting (history, upcoming, maintenance, no-show) | Query layer |
+| Req ID | Description | Entity | Table | Constraint Type |
+|--------|-------------|--------|-------|-----------------|
+| R01 | User account management | User | User | PK, CHECK(role), CHECK(account_status) |
+| R02 | Bookable space catalog | Space | Space | PK, CHECK(space_type), CHECK(capacity > 0) |
+| R03 | Facility/equipment tracking | Facility, SpaceFacility | Facility, SpaceFacility | PK, FK, UQ |
+| R04 | Booking request submission | Booking | Booking | PK, FK(User, Space), CHECK(status) |
+| R05 | Overlap prevention | Booking | Booking | Trigger TRG_Booking_PreventOverlap |
+| R06 | Unavailable space prevention | Space, Booking | Space, Booking | Trigger TRG_Booking_CheckSpaceAvailable |
+| R07 | Capacity enforcement | Space, Booking | Space, Booking | Trigger TRG_Booking_CheckCapacity |
+| R08 | Booking approval workflow | BookingApproval | BookingApproval | PK, FK, UQ(booking_id), CHECK(decision) |
+| R09 | Check-in process | BookingSession | BookingSession | FK, NOT NULL constraints |
+| R10 | Completion/check-out process | BookingSession | BookingSession | CHECK(actual_end > actual_start) |
+| R11 | Maintenance management | Maintenance | Maintenance | PK, FK(Space, User x2), CHECK(status) |
+| R12 | Historical record keeping | All entities | All tables | No ON DELETE CASCADE, audit columns |
+| R13 | Soft-delete for reference data | User, Space | User, Space | IsActive BIT DEFAULT 1 |
+| R14 | Audit trail (CreatedAt/ModifiedAt) | Transactional tables | Booking, BookingApproval, BookingSession, Maintenance | DEFAULT SYSUTCDATETIME(), trigger on UPDATE |

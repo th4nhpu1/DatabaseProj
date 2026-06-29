@@ -13,6 +13,7 @@ erDiagram
     Facility ||--o{ SpaceFacility : installed_in
     Booking ||--o| BookingApproval : approved_by
     Booking ||--o| BookingSession : checked_in
+    Booking ||--o| BookingSession : checked_out
 
     User {
         int user_id PK
@@ -22,6 +23,9 @@ erDiagram
         string role
         string department
         string account_status
+        bit is_active
+        datetime created_at
+        datetime modified_at
     }
 
     Space {
@@ -34,6 +38,9 @@ erDiagram
         int capacity
         string status
         string usage_policy
+        bit is_active
+        datetime created_at
+        datetime modified_at
     }
 
     Facility {
@@ -57,6 +64,7 @@ erDiagram
         string booking_type
         string status
         datetime created_at
+        datetime modified_at
     }
 
     BookingApproval {
@@ -66,6 +74,8 @@ erDiagram
         string decision
         datetime decision_time
         string decision_note
+        datetime created_at
+        datetime modified_at
     }
 
     BookingSession {
@@ -77,6 +87,8 @@ erDiagram
         datetime actual_end
         string final_condition
         string usage_notes
+        datetime created_at
+        datetime modified_at
     }
 
     Maintenance {
@@ -89,34 +101,36 @@ erDiagram
         datetime completion_time
         string status
         string result_note
+        datetime created_at
+        datetime modified_at
     }
 ```
 
 ## Entity Descriptions
 
 ### User
-Central entity for all system users. Account status controls whether the user can make bookings.
+Central entity for all system users. Account status controls whether the user can make bookings. Soft-delete via IsActive flag. Audit columns track record lifecycle.
 
 ### Space
-Every bookable room or area. Status determines availability for booking.
+Every bookable room or area. Status determines availability for booking. Soft-delete via IsActive to preserve historical references. Audit columns track record lifecycle.
 
 ### Facility
-Lookup of equipment/furnishings that may exist in spaces.
+Lookup of equipment/furnishings that may exist in spaces. Reference data — no audit tracking required.
 
 ### SpaceFacility
-Associative entity linking spaces to their available facilities (M:N).
+Associative entity linking spaces to their available facilities (M:N). Junction table — no audit tracking required.
 
 ### Booking
-Core transaction entity. Status drives the booking lifecycle.
+Core transaction entity. Status drives the booking lifecycle. Full audit tracking with CreatedAt and ModifiedAt.
 
 ### BookingApproval
-Records the approval or rejection decision for a booking. Optional — a booking may not yet have been reviewed.
+Records the approval or rejection decision for a booking. Optional — a booking may not yet have been reviewed. Full audit tracking.
 
 ### BookingSession
-Captures check-in and check-out details for a booking that reached the usage stage.
+Captures check-in and check-out details for a booking that reached the usage stage. The `checked_in` and `checked_out` relationships reflect distinct lifecycle events. Full audit tracking.
 
 ### Maintenance
-Tracks all repair and upkeep activities for spaces.
+Tracks all repair and upkeep activities for spaces. Full audit tracking.
 
 ## Relationships and Cardinalities
 
@@ -131,9 +145,12 @@ Tracks all repair and upkeep activities for spaces.
 | User | assigned_to | Maintenance | 1:N | Optional (User) / Optional (Maintenance) |
 | Booking | approved_by | BookingApproval | 1:1 | Mandatory (Booking) / Optional (BookingApproval) |
 | Booking | checked_in | BookingSession | 1:1 | Mandatory (Booking) / Optional (BookingSession) |
+| Booking | checked_out | BookingSession | 1:1 | Mandatory (Booking) / Optional (BookingSession) |
 
 ## Notes
 
 - Booking.status and BookingApproval.decision are intentionally separate to support pending -> rejected flows without deleting records.
-- BookingSession stores both check-in and check-out data in one table to keep the lifecycle self-contained.
+- BookingSession stores both check-in and check-out data in one table to keep the lifecycle self-contained. The `checked_in` relationship applies when actual_start is set; `checked_out` applies when actual_end is set.
 - User has two relationships to Maintenance (reporter and assignee) — both are optional since the system may record maintenance without linking to a specific user.
+- Soft-delete (IsActive) on User and Space allows historical bookings to remain resolvable even after a user or space is deactivated.
+- Audit columns (CreatedAt, ModifiedAt) on all transactional tables provide a complete record lifecycle trail.

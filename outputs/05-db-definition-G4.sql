@@ -4,6 +4,29 @@
 -- ============================================================
 
 -- ------------------------------------------------------------
+-- Create database
+-- ------------------------------------------------------------
+IF DB_ID('CampusSpaceManagement') IS NULL
+    CREATE DATABASE CampusSpaceManagement;
+GO
+
+USE CampusSpaceManagement;
+GO
+
+-- ------------------------------------------------------------
+-- Drop tables in reverse dependency order
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS [BookingSession];
+DROP TABLE IF EXISTS [BookingApproval];
+DROP TABLE IF EXISTS [Booking];
+DROP TABLE IF EXISTS [SpaceFacility];
+DROP TABLE IF EXISTS [Maintenance];
+DROP TABLE IF EXISTS [Facility];
+DROP TABLE IF EXISTS [Space];
+DROP TABLE IF EXISTS [User];
+GO
+
+-- ------------------------------------------------------------
 -- 1. User
 -- ------------------------------------------------------------
 CREATE TABLE [User] (
@@ -14,6 +37,9 @@ CREATE TABLE [User] (
     role NVARCHAR(30) NOT NULL,
     department NVARCHAR(100) NOT NULL,
     account_status NVARCHAR(20) NOT NULL DEFAULT 'active',
+    is_active BIT NOT NULL DEFAULT 1,
+    created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    modified_at DATETIME2 NULL,
     CONSTRAINT PK_User PRIMARY KEY (user_id),
     CONSTRAINT UQ_User_email UNIQUE (email),
     CONSTRAINT CK_User_role CHECK (role IN (
@@ -23,6 +49,7 @@ CREATE TABLE [User] (
         'active', 'inactive', 'suspended'
     ))
 );
+GO
 
 -- ------------------------------------------------------------
 -- 2. Space
@@ -37,6 +64,9 @@ CREATE TABLE [Space] (
     capacity INT NOT NULL,
     status NVARCHAR(30) NOT NULL DEFAULT 'available',
     usage_policy NVARCHAR(MAX) NULL,
+    is_active BIT NOT NULL DEFAULT 1,
+    created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    modified_at DATETIME2 NULL,
     CONSTRAINT PK_Space PRIMARY KEY (space_code),
     CONSTRAINT CK_Space_space_type CHECK (space_type IN (
         'auditorium', 'classroom', 'computer_lab', 'project_lab', 'meeting_room', 'student_workspace'
@@ -46,6 +76,7 @@ CREATE TABLE [Space] (
         'available', 'in_use', 'under_maintenance', 'temporarily_closed', 'retired'
     ))
 );
+GO
 
 -- ------------------------------------------------------------
 -- 3. Facility
@@ -56,6 +87,7 @@ CREATE TABLE [Facility] (
     CONSTRAINT PK_Facility PRIMARY KEY (facility_id),
     CONSTRAINT UQ_Facility_name UNIQUE (facility_name)
 );
+GO
 
 -- ------------------------------------------------------------
 -- 4. SpaceFacility (M:N between Space and Facility)
@@ -69,6 +101,7 @@ CREATE TABLE [SpaceFacility] (
     CONSTRAINT FK_SpaceFacility_Facility FOREIGN KEY (facility_id)
         REFERENCES [Facility](facility_id)
 );
+GO
 
 -- ------------------------------------------------------------
 -- 5. Booking
@@ -83,7 +116,8 @@ CREATE TABLE [Booking] (
     expected_participants INT NOT NULL,
     booking_type NVARCHAR(30) NOT NULL,
     status NVARCHAR(20) NOT NULL DEFAULT 'pending',
-    created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+    created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    modified_at DATETIME2 NULL,
     CONSTRAINT PK_Booking PRIMARY KEY (booking_id),
     CONSTRAINT FK_Booking_User FOREIGN KEY (user_id)
         REFERENCES [User](user_id),
@@ -98,6 +132,7 @@ CREATE TABLE [Booking] (
         'pending', 'approved', 'rejected', 'cancelled', 'checked_in', 'completed', 'no_show'
     ))
 );
+GO
 
 -- ------------------------------------------------------------
 -- 6. BookingApproval
@@ -107,8 +142,10 @@ CREATE TABLE [BookingApproval] (
     booking_id INT NOT NULL,
     staff_id INT NOT NULL,
     decision NVARCHAR(20) NOT NULL,
-    decision_time DATETIME2 NOT NULL DEFAULT GETDATE(),
+    decision_time DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     decision_note NVARCHAR(MAX) NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    modified_at DATETIME2 NULL,
     CONSTRAINT PK_BookingApproval PRIMARY KEY (approval_id),
     CONSTRAINT UQ_BookingApproval_booking UNIQUE (booking_id),
     CONSTRAINT FK_BookingApproval_Booking FOREIGN KEY (booking_id)
@@ -117,6 +154,7 @@ CREATE TABLE [BookingApproval] (
         REFERENCES [User](user_id),
     CONSTRAINT CK_BookingApproval_decision CHECK (decision IN ('approved', 'rejected'))
 );
+GO
 
 -- ------------------------------------------------------------
 -- 7. BookingSession (check-in and check-out)
@@ -130,6 +168,8 @@ CREATE TABLE [BookingSession] (
     actual_end DATETIME2 NULL,
     final_condition NVARCHAR(MAX) NULL,
     usage_notes NVARCHAR(MAX) NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    modified_at DATETIME2 NULL,
     CONSTRAINT PK_BookingSession PRIMARY KEY (session_id),
     CONSTRAINT UQ_BookingSession_booking UNIQUE (booking_id),
     CONSTRAINT FK_BookingSession_Booking FOREIGN KEY (booking_id)
@@ -138,6 +178,7 @@ CREATE TABLE [BookingSession] (
         REFERENCES [User](user_id),
     CONSTRAINT CK_BookingSession_actual_end CHECK (actual_end IS NULL OR actual_end > actual_start)
 );
+GO
 
 -- ------------------------------------------------------------
 -- 8. Maintenance
@@ -152,6 +193,8 @@ CREATE TABLE [Maintenance] (
     completion_time DATETIME2 NULL,
     status NVARCHAR(20) NOT NULL DEFAULT 'reported',
     result_note NVARCHAR(MAX) NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    modified_at DATETIME2 NULL,
     CONSTRAINT PK_Maintenance PRIMARY KEY (maintenance_id),
     CONSTRAINT FK_Maintenance_Space FOREIGN KEY (space_code)
         REFERENCES [Space](space_code),
@@ -164,6 +207,7 @@ CREATE TABLE [Maintenance] (
     )),
     CONSTRAINT CK_Maintenance_completion_time CHECK (completion_time IS NULL OR completion_time >= start_time)
 );
+GO
 
 -- ------------------------------------------------------------
 -- Indexes for performance
@@ -177,8 +221,9 @@ CREATE INDEX IX_Maintenance_status ON [Maintenance](status);
 CREATE INDEX IX_BookingApproval_booking_id ON [BookingApproval](booking_id);
 CREATE INDEX IX_BookingSession_booking_id ON [BookingSession](booking_id);
 GO
+
 -- ============================================================
--- TRIGGERS
+-- TRIGGERS — Business Rules
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -264,5 +309,105 @@ BEGIN
         ROLLBACK TRANSACTION;
         THROW 50003, 'Capacity exceeded: expected participants exceeds room capacity.', 1;
     END;
+END;
+GO
+
+-- ============================================================
+-- TRIGGERS — Audit (ModifiedAt auto-update)
+-- ============================================================
+
+-- User ModifiedAt
+CREATE TRIGGER TRG_User_ModifiedAt
+ON [User]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF NOT EXISTS (SELECT 1 FROM deleted)
+        RETURN;
+    UPDATE [User]
+    SET modified_at = SYSUTCDATETIME()
+    FROM [User] u
+    JOIN inserted i ON u.user_id = i.user_id;
+END;
+GO
+
+-- Space ModifiedAt
+CREATE TRIGGER TRG_Space_ModifiedAt
+ON [Space]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF NOT EXISTS (SELECT 1 FROM deleted)
+        RETURN;
+    UPDATE [Space]
+    SET modified_at = SYSUTCDATETIME()
+    FROM [Space] s
+    JOIN inserted i ON s.space_code = i.space_code;
+END;
+GO
+
+-- Booking ModifiedAt
+CREATE TRIGGER TRG_Booking_ModifiedAt
+ON [Booking]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF NOT EXISTS (SELECT 1 FROM deleted)
+        RETURN;
+    UPDATE [Booking]
+    SET modified_at = SYSUTCDATETIME()
+    FROM [Booking] b
+    JOIN inserted i ON b.booking_id = i.booking_id;
+END;
+GO
+
+-- BookingApproval ModifiedAt
+CREATE TRIGGER TRG_BookingApproval_ModifiedAt
+ON [BookingApproval]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF NOT EXISTS (SELECT 1 FROM deleted)
+        RETURN;
+    UPDATE [BookingApproval]
+    SET modified_at = SYSUTCDATETIME()
+    FROM [BookingApproval] ba
+    JOIN inserted i ON ba.approval_id = i.approval_id;
+END;
+GO
+
+-- BookingSession ModifiedAt
+CREATE TRIGGER TRG_BookingSession_ModifiedAt
+ON [BookingSession]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF NOT EXISTS (SELECT 1 FROM deleted)
+        RETURN;
+    UPDATE [BookingSession]
+    SET modified_at = SYSUTCDATETIME()
+    FROM [BookingSession] bs
+    JOIN inserted i ON bs.session_id = i.session_id;
+END;
+GO
+
+-- Maintenance ModifiedAt
+CREATE TRIGGER TRG_Maintenance_ModifiedAt
+ON [Maintenance]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF NOT EXISTS (SELECT 1 FROM deleted)
+        RETURN;
+    UPDATE [Maintenance]
+    SET modified_at = SYSUTCDATETIME()
+    FROM [Maintenance] m
+    JOIN inserted i ON m.maintenance_id = i.maintenance_id;
 END;
 GO
