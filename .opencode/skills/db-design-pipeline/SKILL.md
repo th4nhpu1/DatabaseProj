@@ -105,6 +105,16 @@ Use this skill when the user asks to transform the Campus Space Management Syste
     8. Find the most frequently booked space type
     9. Get maintenance history for a specific space
     10. List pending bookings that need approval
+	11. Booking Count by Status (Dashboard Summary)
+    12. Users with Most Bookings (Top 5)
+	13. No-Show Rate by User (Reliability Ranking)
+	14. Approver Workload and Decision Split
+	15. Bookings by Department (Demand by Faculty)
+	16. Peak Booking Hours (Busiest Times of Day)
+	17. Facilities Available in Each Space
+	18. Find Spaces That Have Specific Required Equipment
+	19. Capacity Fit — How Full Was Each Completed Booking
+	20. Rooms With Confirmed Bookings While Under Maintenance
   - Include a header for each query containing: Business Question, Target User, and Logic Explanation.
   - **CRITICAL PARAMETERIZATION:** Do not hardcode filter IDs. You MUST use `DECLARE @VariableName Type = Value;` for all `WHERE` clause filters.
   - **CRITICAL EMPTY RESULT PREVENTION:** Mentally execute the query against the Step 6 data using the current real-world date. Ensure the queries return sensible, non-empty results.
