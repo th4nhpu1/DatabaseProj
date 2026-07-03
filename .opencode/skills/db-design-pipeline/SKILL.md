@@ -94,7 +94,7 @@ Use this skill when the user asks to transform the Campus Space Management Syste
 - **Input:** The DDL from Step 5 and Sample Data from Step 6.
 - **Output:** `outputs/07-query-design-G04.sql`
 - **Requirement:** 
-  - Write at least 10 meaningful SQL queries answering real operational questions (e.g., utilization rates, pending queues, maintenance logs):
+  - Write meaningful SQL queries answering real operational questions (e.g., utilization rates, pending queues, maintenance logs):
     1. List all available spaces for a given time range
     2. Find conflicting bookings for a space
     3. View booking history of a user
@@ -115,7 +115,11 @@ Use this skill when the user asks to transform the Campus Space Management Syste
 	18. Find Spaces That Have Specific Required Equipment
 	19. Capacity Fit — How Full Was Each Completed Booking
 	20. Rooms With Confirmed Bookings While Under Maintenance
-  - Include a header for each query containing: Business Question, Target User, and Logic Explanation.
+  - - Include a SQL comment header for each query strictly containing: 
+    * Business Question
+    * Target User
+    * Logic Explanation 
+    * Practical Application of the query(Why it is useful?).
   - **CRITICAL PARAMETERIZATION:** Do not hardcode filter IDs. You MUST use `DECLARE @VariableName Type = Value;` for all `WHERE` clause filters.
   - **CRITICAL EMPTY RESULT PREVENTION:** Mentally execute the query against the Step 6 data using the current real-world date. Ensure the queries return sensible, non-empty results.
 
