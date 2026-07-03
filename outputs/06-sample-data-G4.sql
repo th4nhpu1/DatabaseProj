@@ -266,17 +266,15 @@ GO
 
 -- ============================================================
 -- Test 1: Overlap Prevention
--- Attempt to approve a booking that overlaps with an existing
--- approved booking for the same space (CL-201).
--- Booking 7 is approved for CL-201 on 2026-07-03 08:00-10:00.
+-- Attempt to insert an approved booking that overlaps with an
+-- existing approved booking for the same space (CL-202).
+-- Booking 7 is approved for CL-202 on 2026-07-03 08:00-10:00.
 -- This would create an overlap at 2026-07-03 09:00-11:00.
 -- Expect: TRG_Booking_PreventOverlap throws error 50001.
 -- ============================================================
 -- BEGIN TRY
 --     INSERT INTO [Booking] (user_id, space_code, requested_start, requested_end, purpose, expected_participants, booking_type, status)
---     VALUES (4, 'CL-201', '2026-07-03 09:00:00', '2026-07-03 11:00:00', N'Test overlap — sẽ bị lỗi', 30, 'workshop', 'pending');
---     -- Attempt to approve it:
---     UPDATE [Booking] SET status = 'approved' WHERE booking_id = SCOPE_IDENTITY();
+--     VALUES (4, 'CL-202', '2026-07-03 09:00:00', '2026-07-03 11:00:00', N'Test overlap — sẽ bị lỗi', 30, 'workshop', 'approved');
 -- END TRY
 -- BEGIN CATCH
 --     PRINT 'ERROR (expected): ' + ERROR_MESSAGE();
